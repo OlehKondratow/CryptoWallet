@@ -1,0 +1,57 @@
+# Build outputs
+build/
+*.o
+*.obj
+*.elf
+*.bin
+*.hex
+*.map
+*.d
+*.su
+*.dwo
+
+# Linker / libraries / native artifacts
+*.ilk
+*.exp
+*.a
+*.la
+*.lo
+*.lib
+*.dll
+*.so
+*.so.*
+*.dylib
+*.out
+*.exe
+*.app
+*.i*86
+*.x86_64
+
+# Precompiled headers
+*.gch
+*.pch
+
+# Python / MkDocs
+.venv-docs/
+.venv/
+__pycache__/
+*.py[cod]
+.Python
+*.egg-info/
+.eggs/
+docs/
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary / local
+config-copied
+*.bak
