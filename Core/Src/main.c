@@ -14,6 +14,12 @@
 #include "wallet_shared.h"
 #include "task_display.h"
 #include "task_net.h"
+#include "task_sign.h"
+#include "task_io.h"
+#include "task_user.h"
+#ifdef USE_CRYPTO_SIGN
+#include "crypto_wallet.h"
+#endif
 #ifndef SKIP_OLED
 #define SKIP_OLED 0
 #endif
@@ -39,6 +45,8 @@ SemaphoreHandle_t g_ui_mutex = NULL;
 display_context_t g_display_ctx = {0};
 SemaphoreHandle_t g_display_ctx_mutex = NULL;
 volatile uint8_t  g_security_alert = 0;
+uint8_t          g_last_sig[64] = {0};
+volatile uint8_t  g_last_sig_ready = 0;
 
 /**
  * @brief Fatal error handler - log and infinite loop.
@@ -90,6 +98,9 @@ int main(void)
     HW_Init();
 
     time_service_init();
+#ifdef USE_CRYPTO_SIGN
+    crypto_rng_init();
+#endif
     Task_Display_Log("CryptoWallet + LwIP");
     HAL_GPIO_WritePin(LED1_GPIO_PORT, LED1_PIN, LED1_ON_LEVEL);
     HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, LED2_OFF_LEVEL);
@@ -124,6 +135,9 @@ int main(void)
     }
     Task_Display_Create();
     Task_Net_Create();
+    Task_Sign_Create();
+    Task_IO_Create();
+    Task_User_Create();
     Task_Display_Log("main: tasks created, starting scheduler");
 
 #if !SKIP_OLED

@@ -29,8 +29,10 @@
 
 static void display_task(void *pvParameters);
 
+#define LOG_LINE_CHARS  21U  /**< SSD1306 128px / 6px per char */
+
 /**
- * @brief Append log message to UART (stub for minimal build).
+ * @brief Append log message to UART and update display line 4.
  * @param msg Null-terminated string.
  */
 void Task_Display_Log(const char *msg)
@@ -38,6 +40,19 @@ void Task_Display_Log(const char *msg)
     if (msg != NULL) {
         UART_Log(msg);
         UART_Log("\r\n");
+        if (g_display_ctx_mutex != NULL &&
+            xSemaphoreTake(g_display_ctx_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
+            size_t dst = 0;
+            for (size_t src = 0; msg[src] != '\0' && dst < sizeof(g_display_ctx.log_line) - 1U; src++) {
+                char c = msg[src];
+                if (c == '\r' || c == '\n') c = ' ';
+                if ((unsigned char)c >= 0x20U && (unsigned char)c <= 0x7EU) {
+                    g_display_ctx.log_line[dst++] = c;
+                }
+            }
+            g_display_ctx.log_line[dst] = '\0';
+            xSemaphoreGive(g_display_ctx_mutex);
+        }
     }
 }
 
@@ -107,6 +122,16 @@ static void display_task(void *pvParameters)
             if (g_display_ctx_mutex != NULL && xSemaphoreTake(g_display_ctx_mutex, pdMS_TO_TICKS(20)) == pdTRUE) {
                 ssd1306_SetCursor(0, 16);
                 ssd1306_WriteString(g_display_ctx.ip_addr[0] ? g_display_ctx.ip_addr : "DHCP...", Font_6x8, White);
+                ssd1306_SetCursor(0, 24);
+                {
+                    char disp[LOG_LINE_CHARS + 1];
+                    size_t len = 0;
+                    while (g_display_ctx.log_line[len] != '\0' && len < LOG_LINE_CHARS) len++;
+                    (void)memcpy(disp, g_display_ctx.log_line, len);
+                    for (; len < LOG_LINE_CHARS; len++) disp[len] = ' ';
+                    disp[LOG_LINE_CHARS] = '\0';
+                    ssd1306_WriteString(disp, Font_6x8, White);
+                }
                 xSemaphoreGive(g_display_ctx_mutex);
             }
             ssd1306_UpdateScreen();

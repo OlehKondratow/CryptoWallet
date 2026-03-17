@@ -14,39 +14,56 @@
 #include "memzero.h"
 #include <string.h>
 
+#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
 /* trezor-crypto includes */
 #include "bip39.h"
 #include "bip32.h"
 #include "ecdsa.h"
 #include "secp256k1.h"
 #include "rand.h"
-#include "hasher.h"
-
-/* STM32 HAL */
+#include "sha2.h"
 #include "stm32h7xx_hal.h"
+#else
+#include "sha256_minimal.h"
+#endif
 
+#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
 /*-----------------------------------------------------------------------------
  * RNG: STM32 TRNG + entropy mixing
- *-----------------------------------------------------------------------------
- * Define hrng in your project (MX_RNG_Init) and enable HAL_RNG_MODULE_ENABLED.
- */
+ *-----------------------------------------------------------------------------*/
 __attribute__((weak)) RNG_HandleTypeDef hrng = {0};
 
 static volatile uint32_t s_rng_entropy_pool = 0U;
 
-/**
- * @brief Mix additional entropy into pool (called by random_reseed).
- */
 void random_reseed(const uint32_t value)
 {
     s_rng_entropy_pool ^= value;
 }
 
-/**
- * @brief Override trezor-crypto random_buffer: use STM32 RNG + ADC noise.
- * @details Combines HAL_RNG_GenerateRandomNumber with XOR of entropy pool.
- *          Include: trezor-crypto/rand.h (for declaration override)
- */
+uint32_t random32(void)
+{
+    uint32_t r;
+    random_buffer((uint8_t *)&r, sizeof(r));
+    return r;
+}
+
+uint32_t random_uniform(uint32_t n)
+{
+    uint32_t x, max = 0xFFFFFFFFU - (0xFFFFFFFFU % n);
+    while ((x = random32()) >= max) { (void)0; }
+    return x / (max / n);
+}
+
+void random_permute(char *str, size_t len)
+{
+    for (int i = (int)len - 1; i >= 1; i--) {
+        int j = (int)random_uniform((uint32_t)(i + 1));
+        char t = str[j];
+        str[j] = str[i];
+        str[i] = t;
+    }
+}
+
 void random_buffer(uint8_t *buf, size_t len)
 {
     if (buf == NULL || len == 0U) return;
@@ -57,7 +74,6 @@ void random_buffer(uint8_t *buf, size_t len)
             rng_val ^= s_rng_entropy_pool;
             s_rng_entropy_pool = (s_rng_entropy_pool * 1664525U) + 1013904223U;
         } else {
-            /* Fallback when RNG not initialized — NOT for production */
             rng_val = s_rng_entropy_pool;
             s_rng_entropy_pool = (s_rng_entropy_pool * 1664525U) + 1013904223U;
         }
@@ -67,16 +83,10 @@ void random_buffer(uint8_t *buf, size_t len)
     }
 }
 
-/**
- * @brief Initialize RNG: enable TRNG, gather ADC entropy for random_reseed.
- */
 int crypto_rng_init(void)
 {
-    /* RNG clock and init must be done in HAL (e.g. MX_RNG_Init) */
     if (hrng.Instance == NULL) return -1;
 
-    /* Mix in ADC noise as extra entropy (optional but recommended) */
-    /* Use uninitialized stack + HAL_GetTick as fallback if no ADC */
     uint32_t adc_noise = HAL_GetTick();
     for (volatile int i = 0; i < 8; i++) {
         adc_noise ^= (adc_noise << 13);
@@ -87,7 +97,14 @@ int crypto_rng_init(void)
 
     return 0;
 }
+#else
+int crypto_rng_init(void)
+{
+    return 0;
+}
+#endif
 
+#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
 /*-----------------------------------------------------------------------------
  * BIP-39: 128 bits -> 12 words
  *-----------------------------------------------------------------------------
@@ -173,4 +190,50 @@ int crypto_sign_btc_hash(uint8_t priv_key[32],
     memzero(priv_key, 32);
 
     return (ret == 0) ? 0 : -1;
+}
+
+#else
+/* Stubs when USE_CRYPTO_SIGN=0 */
+int crypto_entropy_to_mnemonic_12(const uint8_t entropy[CRYPTO_ENTROPY_128_BITS],
+                                  char *mnemonic_out, size_t mnemonic_size)
+{
+    (void)entropy;
+    (void)mnemonic_out;
+    (void)mnemonic_size;
+    return -1;
+}
+
+int crypto_derive_btc_m44_0_0_0_0(const uint8_t *seed, size_t seed_len,
+                                  uint8_t priv_key_out[32])
+{
+    (void)seed;
+    (void)seed_len;
+    (void)priv_key_out;
+    return -1;
+}
+
+int crypto_sign_btc_hash(uint8_t priv_key[32],
+                         const uint8_t hash[CRYPTO_SHA256_DIGEST_LEN],
+                         uint8_t sig_out[CRYPTO_ECDSA_SIG_LEN])
+{
+    (void)priv_key;
+    (void)hash;
+    (void)sig_out;
+    return -1;
+}
+#endif
+
+/*-----------------------------------------------------------------------------
+ * SHA-256: one-shot hash (always compiled)
+ *-----------------------------------------------------------------------------*/
+int crypto_hash_sha256(const uint8_t *data, size_t len,
+                       uint8_t digest_out[CRYPTO_SHA256_DIGEST_LEN])
+{
+    if (data == NULL || digest_out == NULL) return -1;
+#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
+    sha256_Raw(data, len, digest_out);
+#else
+    sha256_minimal(data, len, digest_out);
+#endif
+    return 0;
 }

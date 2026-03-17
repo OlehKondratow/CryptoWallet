@@ -10,6 +10,9 @@
 
 #include "main.h"
 #include "hw_init.h"
+#if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
+#include "usb_device.h"
+#endif
 #include <stddef.h>
 #if defined(USE_LWIP) && !SKIP_OLED
 #include "ssd1306.h"
@@ -84,6 +87,13 @@ void HW_Init_Early_LwIP(void)
 static void MX_GPIO_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_USART3_Init(void);
+#if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
+extern void MX_USB_Device_Init(void);
+#endif
+#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
+extern RNG_HandleTypeDef hrng;
+static void MX_RNG_Init(void);
+#endif
 
 /**
  * @brief Initialize all hardware subsystems.
@@ -108,7 +118,30 @@ void HW_Init(void)
     ssd1306_Init();
 #endif
     MX_USART3_Init();
+#if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
+    MX_USB_Device_Init();
+#endif
+#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
+    MX_RNG_Init();
+#endif
 }
+
+#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
+void HAL_RNG_MspInit(RNG_HandleTypeDef *rng_handle)
+{
+    (void)rng_handle;
+    __HAL_RCC_RNG_CLK_ENABLE();
+}
+
+static void MX_RNG_Init(void)
+{
+    hrng.Instance = RNG;
+    hrng.Init.ClockErrorDetection = RNG_CED_ENABLE;
+    if (HAL_RNG_Init(&hrng) != HAL_OK) {
+        /* RNG init failed — crypto_rng_init will use fallback */
+    }
+}
+#endif
 
 static void SystemClock_Config(void)
 {

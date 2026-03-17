@@ -3,8 +3,8 @@
   * @file    crypto_wallet.h
   * @brief   trezor-crypto integration: RNG, BIP-39, BIP-32, ECDSA secp256k1.
   ******************************************************************************
-  * @details Requires trezor-crypto (github.com/trezor/trezor-crypto).
-  *          Target: STM32H743 (TRNG + ADC entropy). ARM GCC compatible.
+ * @details Requires trezor-crypto (github.com/trezor/trezor-crypto).
+ *          Target: STM32H743 (TRNG + timer entropy). ARM GCC compatible.
   ******************************************************************************
   */
 
@@ -27,12 +27,12 @@ extern "C" {
 #define CRYPTO_ECDSA_SIG_LEN       64U   /**< Compact signature (r||s) */
 
 /*-----------------------------------------------------------------------------
- * RNG initialization (STM32 TRNG + ADC entropy)
+ * RNG initialization (STM32 TRNG + timer entropy)
  *-----------------------------------------------------------------------------*/
 
 /**
  * @brief Initialize RNG for trezor-crypto random_buffer.
- * @details Enables STM32 RNG peripheral and seeds with TRNG + ADC noise.
+ * @details Enables STM32 RNG peripheral and seeds with TRNG + timer noise.
  *          Call before any BIP-39/BIP-32 operation.
  * @return 0 on success, -1 on error.
  */
@@ -69,6 +69,21 @@ int crypto_entropy_to_mnemonic_12(const uint8_t entropy[CRYPTO_ENTROPY_128_BITS]
  */
 int crypto_derive_btc_m44_0_0_0_0(const uint8_t *seed, size_t seed_len,
                                   uint8_t priv_key_out[32]);
+
+/*-----------------------------------------------------------------------------
+ * SHA-256 hash
+ *-----------------------------------------------------------------------------*/
+
+/**
+ * @brief Compute SHA-256 of data (32-byte digest).
+ * @param data Input buffer.
+ * @param len  Input length in bytes.
+ * @param digest_out Output 32-byte digest.
+ * @return 0 on success, -1 on error.
+ * @note Uses sha256_Raw from trezor-crypto/sha2.c when available.
+ */
+int crypto_hash_sha256(const uint8_t *data, size_t len,
+                       uint8_t digest_out[CRYPTO_SHA256_DIGEST_LEN]);
 
 /*-----------------------------------------------------------------------------
  * ECDSA signature (secp256k1)

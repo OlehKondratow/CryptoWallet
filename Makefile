@@ -5,6 +5,7 @@
 USE_LWIP ?= 1
 
 TOP         ?= $(CURDIR)
+TREZOR_CRYPTO ?= $(abspath $(TOP)/ThirdParty/trezor-crypto)
 CUBE_ROOT   ?= $(abspath $(TOP)/../STM32CubeH7)
 SSD1306     ?= $(abspath $(TOP)/../stm32-ssd1306)
 SECURE_BOOT ?= $(abspath $(TOP)/../stm32_secure_boot)
@@ -33,6 +34,28 @@ CFLAGS  += -I$(CUBE_ROOT)/Drivers/CMSIS/Device/ST/STM32H7xx/Include
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc
 CFLAGS  += -I$(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Inc/Legacy
 CFLAGS  += -I$(TEMPLATE)/Inc
+# USE_TEST_SEED=1: test mnemonic "abandon...about" for dev (NEVER for real funds)
+# Implies USE_CRYPTO_SIGN=1
+USE_TEST_SEED ?= 0
+ifeq ($(USE_TEST_SEED),1)
+USE_CRYPTO_SIGN := 1
+endif
+# USE_CRYPTO_SIGN=1: full trezor-crypto + ECDSA (requires ThirdParty/trezor-crypto)
+USE_CRYPTO_SIGN ?= 0
+ifeq ($(USE_CRYPTO_SIGN),1)
+CFLAGS  += -I$(TREZOR_CRYPTO)
+CFLAGS  += -DHAL_RNG_MODULE_ENABLED -DUSE_CRYPTO_SIGN=1
+CFLAGS  += -DRAND_PLATFORM_INDEPENDENT -DUSE_BIP32_25519_CURVES=0
+endif
+ifeq ($(USE_TEST_SEED),1)
+CFLAGS  += -DUSE_TEST_SEED=1
+endif
+# USE_WEBUSB=1: USB device + WebUSB (PA11/PA12, CN13)
+USE_WEBUSB ?= 0
+ifeq ($(USE_WEBUSB),1)
+CFLAGS  += -DUSE_WEBUSB=1 -DHAL_PCD_MODULE_ENABLED
+CFLAGS  += -I$(CUBE_ROOT)/Middlewares/ST/STM32_USB_Device_Library/Core/Inc
+endif
 
 ifeq ($(USE_LWIP),1)
 CFLAGS  += -I$(LWIP_CUBE)/Middlewares/Third_Party/LwIP/src/include
@@ -110,8 +133,28 @@ docs-serve:
 # Minimal + LwIP: use lwip_zero startup+system (same as working lwip_zero)
 LWIP_STARTUP = $(LWIP_CUBE)/Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/gcc/startup_stm32h743xx.s
 LWIP_SYSTEM  = $(LWIP_APP)/Src/system_stm32h7xx.c
-OBJ_MINIMAL_LWIP = $(BUILD)/main.o $(BUILD)/hw_init.o $(BUILD)/stm32h7xx_hal_msp.o $(BUILD)/stm32h7xx_it_lwip.o $(BUILD)/stm32h7xx_it_systick.o \
-      $(BUILD)/task_display_minimal.o $(BUILD)/task_net.o $(BUILD)/time_service.o \
+CRYPTO_OBJ = $(BUILD)/crypto_wallet.o $(BUILD)/sha256_minimal.o
+ifeq ($(USE_TEST_SEED),1)
+CRYPTO_OBJ += $(BUILD)/wallet_seed.o
+endif
+ifeq ($(USE_CRYPTO_SIGN),1)
+CRYPTO_OBJ += $(BUILD)/hal_rng.o
+endif
+ifeq ($(USE_CRYPTO_SIGN),1)
+CRYPTO_OBJ += $(BUILD)/trezor_bip39.o $(BUILD)/trezor_bip32.o $(BUILD)/trezor_ecdsa.o $(BUILD)/trezor_secp256k1.o \
+      $(BUILD)/trezor_sha2.o $(BUILD)/trezor_hmac.o $(BUILD)/trezor_pbkdf2.o $(BUILD)/trezor_bignum.o \
+      $(BUILD)/trezor_hasher.o $(BUILD)/trezor_base58.o $(BUILD)/trezor_address.o \
+      $(BUILD)/trezor_ripemd160.o $(BUILD)/trezor_rfc6979.o $(BUILD)/trezor_curves.o $(BUILD)/trezor_nist256p1.o \
+      $(BUILD)/trezor_hmac_drbg.o $(BUILD)/trezor_blake256.o $(BUILD)/trezor_sha3.o $(BUILD)/trezor_groestl.o \
+      $(BUILD)/trezor_blake2b.o $(BUILD)/trezor_blake2s.o \
+      $(BUILD)/trezor_ed25519.o $(BUILD)/trezor_ed25519_sha3.o $(BUILD)/trezor_ed25519_keccak.o \
+      $(BUILD)/trezor_curve25519_32bit.o $(BUILD)/trezor_curve25519_helpers.o $(BUILD)/trezor_modm_32bit.o \
+      $(BUILD)/trezor_ed25519_basepoint.o $(BUILD)/trezor_ed25519_32bit_tables.o $(BUILD)/trezor_ed25519_impl.o \
+      $(BUILD)/trezor_curve25519_scalarmult.o
+endif
+OBJ_MINIMAL_LWIP = $(BUILD)/main.o $(BUILD)/hw_init.o $(BUILD)/memzero.o $(BUILD)/stm32h7xx_hal_msp.o $(BUILD)/stm32h7xx_it_lwip.o $(BUILD)/stm32h7xx_it_systick.o \
+      $(BUILD)/task_display_minimal.o $(BUILD)/task_net.o $(BUILD)/task_sign.o $(BUILD)/task_io.o $(BUILD)/task_user.o $(BUILD)/tx_request_validate.o $(BUILD)/time_service.o \
+      $(CRYPTO_OBJ) \
       $(BUILD)/startup_minimal_lwip.o $(BUILD)/system_minimal_lwip.o $(BUILD)/stm32h7xx_hal_timebase_tim.o \
       $(BUILD)/hal.o $(BUILD)/hal_cortex.o $(BUILD)/hal_gpio.o $(BUILD)/hal_rcc.o $(BUILD)/hal_rcc_ex.o \
       $(BUILD)/hal_i2c.o $(BUILD)/hal_i2c_ex.o $(BUILD)/hal_uart.o $(BUILD)/hal_uart_ex.o $(BUILD)/hal_dma.o $(BUILD)/hal_pwr.o $(BUILD)/hal_tim.o $(BUILD)/hal_tim_ex.o \
@@ -126,6 +169,16 @@ OBJ_MINIMAL_LWIP = $(BUILD)/main.o $(BUILD)/hw_init.o $(BUILD)/stm32h7xx_hal_msp
       $(BUILD)/lwip_timeouts.o $(BUILD)/lwip_ip4.o $(BUILD)/lwip_icmp.o $(BUILD)/lwip_etharp.o $(BUILD)/lwip_dhcp.o $(BUILD)/lwip_acd.o $(BUILD)/lwip_ip4_addr.o \
       $(BUILD)/lwip_ip4_frag.o $(BUILD)/lwip_ethernet.o $(BUILD)/lwip_slip.o $(BUILD)/lwip_sntp.o \
       $(BUILD)/ssd1306.o $(BUILD)/ssd1306_fonts.o
+
+USB_CUBE   := $(abspath $(TOP)/../STM32CubeH7)
+USB_MW     := $(USB_CUBE)/Middlewares/ST/STM32_USB_Device_Library
+WEBUSB_OBJ := $(BUILD)/usbd_conf_cw.o $(BUILD)/usbd_desc_cw.o $(BUILD)/usb_device.o \
+      $(BUILD)/usb_webusb.o $(BUILD)/stm32h7xx_it_usb.o
+ifeq ($(USE_WEBUSB),1)
+OBJ_MINIMAL_LWIP += $(WEBUSB_OBJ) \
+      $(BUILD)/hal_pcd.o $(BUILD)/hal_pcd_ex.o $(BUILD)/ll_usb.o \
+      $(BUILD)/usbd_core.o $(BUILD)/usbd_ctlreq.o $(BUILD)/usbd_ioreq.o
+endif
 
 # Build: FreeRTOS + LwIP + display (single firmware)
 minimal-lwip: CUBE_ROOT = $(LWIP_CUBE)
@@ -191,8 +244,89 @@ $(BUILD)/task_security.o: $(TOP)/Core/Src/task_security.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/task_net.o: $(TOP)/Src/task_net.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/task_sign.o: $(TOP)/Core/Src/task_sign.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/task_io.o: $(TOP)/Core/Src/task_io.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/task_user.o: $(TOP)/Core/Src/task_user.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/tx_request_validate.o: $(TOP)/Core/Src/tx_request_validate.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/crypto_wallet.o: $(TOP)/Core/Src/crypto_wallet.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/sha256_minimal.o: $(TOP)/Core/Src/sha256_minimal.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+ifeq ($(USE_TEST_SEED),1)
+$(BUILD)/wallet_seed.o: $(TOP)/Core/Src/wallet_seed.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+endif
+
+$(BUILD)/trezor_bip39.o: $(TREZOR_CRYPTO)/bip39.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_bip32.o: $(TREZOR_CRYPTO)/bip32.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_ecdsa.o: $(TREZOR_CRYPTO)/ecdsa.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_secp256k1.o: $(TREZOR_CRYPTO)/secp256k1.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_sha2.o: $(TREZOR_CRYPTO)/sha2.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_hmac.o: $(TREZOR_CRYPTO)/hmac.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_pbkdf2.o: $(TREZOR_CRYPTO)/pbkdf2.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_bignum.o: $(TREZOR_CRYPTO)/bignum.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_rand.o: $(TREZOR_CRYPTO)/rand.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_hasher.o: $(TREZOR_CRYPTO)/hasher.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_base58.o: $(TREZOR_CRYPTO)/base58.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_address.o: $(TREZOR_CRYPTO)/address.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_ripemd160.o: $(TREZOR_CRYPTO)/ripemd160.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_rfc6979.o: $(TREZOR_CRYPTO)/rfc6979.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_curves.o: $(TREZOR_CRYPTO)/curves.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_nist256p1.o: $(TREZOR_CRYPTO)/nist256p1.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_hmac_drbg.o: $(TREZOR_CRYPTO)/hmac_drbg.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_blake256.o: $(TREZOR_CRYPTO)/blake256.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_sha3.o: $(TREZOR_CRYPTO)/sha3.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_groestl.o: $(TREZOR_CRYPTO)/groestl.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_blake2b.o: $(TREZOR_CRYPTO)/blake2b.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/trezor_blake2s.o: $(TREZOR_CRYPTO)/blake2s.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+TREZOR_ED25519 := $(TREZOR_CRYPTO)/ed25519-donna
+$(BUILD)/trezor_ed25519.o: $(TREZOR_ED25519)/ed25519.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_ed25519_sha3.o: $(TREZOR_ED25519)/ed25519-sha3.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_ed25519_keccak.o: $(TREZOR_ED25519)/ed25519-keccak.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_curve25519_32bit.o: $(TREZOR_ED25519)/curve25519-donna-32bit.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_curve25519_helpers.o: $(TREZOR_ED25519)/curve25519-donna-helpers.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_modm_32bit.o: $(TREZOR_ED25519)/modm-donna-32bit.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_ed25519_basepoint.o: $(TREZOR_ED25519)/ed25519-donna-basepoint-table.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_ed25519_32bit_tables.o: $(TREZOR_ED25519)/ed25519-donna-32bit-tables.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_ed25519_impl.o: $(TREZOR_ED25519)/ed25519-donna-impl-base.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
+$(BUILD)/trezor_curve25519_scalarmult.o: $(TREZOR_ED25519)/curve25519-donna-scalarmult-base.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(TREZOR_ED25519) -c -o $@ $<
 
 $(BUILD)/startup.o: $(STARTUP) | $(BUILD)
 	$(AS) $(filter-out -include $(TOP)/Core/Inc/lwipopts.h,$(CFLAGS)) -c -o $@ $<
@@ -226,6 +360,10 @@ $(BUILD)/hal_dma.o: $(HAL_SRC)/stm32h7xx_hal_dma.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_pwr.o: $(HAL_SRC)/stm32h7xx_hal_pwr.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
+ifeq ($(USE_CRYPTO_SIGN),1)
+$(BUILD)/hal_rng.o: $(HAL_SRC)/stm32h7xx_hal_rng.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+endif
 $(BUILD)/hal_tim.o: $(HAL_SRC)/stm32h7xx_hal_tim.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/hal_tim_ex.o: $(HAL_SRC)/stm32h7xx_hal_tim_ex.c | $(BUILD)
@@ -248,6 +386,31 @@ $(BUILD)/ssd1306.o: $(SSD1306)/ssd1306/ssd1306.c | $(BUILD)
 	$(CC) $(CFLAGS) -I$(TOP)/Drivers/ssd1306 -c -o $@ $<
 $(BUILD)/ssd1306_fonts.o: $(SSD1306)/ssd1306/ssd1306_fonts.c | $(BUILD)
 	$(CC) $(CFLAGS) -I$(TOP)/Drivers/ssd1306 -c -o $@ $<
+
+ifeq ($(USE_WEBUSB),1)
+$(BUILD)/usbd_conf_cw.o: $(TOP)/Core/Src/usbd_conf_cw.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(USB_MW)/Core/Inc -c -o $@ $<
+$(BUILD)/usbd_desc_cw.o: $(TOP)/Core/Src/usbd_desc_cw.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(USB_MW)/Core/Inc -c -o $@ $<
+$(BUILD)/usb_device.o: $(TOP)/Core/Src/usb_device.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(USB_MW)/Core/Inc -c -o $@ $<
+$(BUILD)/usb_webusb.o: $(TOP)/Core/Src/usb_webusb.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(USB_MW)/Core/Inc -c -o $@ $<
+$(BUILD)/stm32h7xx_it_usb.o: $(TOP)/Core/Src/stm32h7xx_it_usb.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/hal_pcd.o: $(USB_CUBE)/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pcd.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/hal_pcd_ex.o: $(USB_CUBE)/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pcd_ex.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/ll_usb.o: $(USB_CUBE)/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_ll_usb.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/usbd_core.o: $(USB_MW)/Core/Src/usbd_core.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(USB_MW)/Core/Inc -c -o $@ $<
+$(BUILD)/usbd_ctlreq.o: $(USB_MW)/Core/Src/usbd_ctlreq.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(USB_MW)/Core/Inc -c -o $@ $<
+$(BUILD)/usbd_ioreq.o: $(USB_MW)/Core/Src/usbd_ioreq.c | $(BUILD)
+	$(CC) $(CFLAGS) -I$(USB_MW)/Core/Inc -c -o $@ $<
+endif
 
 ifeq ($(USE_LWIP),1)
 $(BUILD)/ethernetif.o: $(LWIP_APP)/Src/ethernetif.c | $(BUILD)

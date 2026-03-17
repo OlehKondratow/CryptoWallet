@@ -1,11 +1,10 @@
 /**
   ******************************************************************************
   * @file    task_io.h
-  * @brief   IO module - LEDs and User Button (PC13) with software debouncing.
+  * @brief   IO module - LEDs only.
   ******************************************************************************
   * @details LED1 (Green) System OK, LED2 (Yellow) Network, LED3 (Red) Security.
-  *          User Button: short press = Confirm, long press = Reject.
-  *          Signals task_security via Event Group (EVENT_USER_CONFIRMED/REJECTED).
+  *          USER button handling in task_user.c.
   ******************************************************************************
   */
 

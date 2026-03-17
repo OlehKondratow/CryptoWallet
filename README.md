@@ -15,6 +15,7 @@ Modular FreeRTOS-based firmware for a Secure Crypto Wallet on **STM32H743ZI2 (Nu
 - **STM32CubeH7** (sibling `../STM32CubeH7`)
 - **stm32-ssd1306** (sibling `../stm32-ssd1306`)
 - **stm32_secure_boot** (sibling `../stm32_secure_boot`) — linker script, FreeRTOS
+- **trezor-crypto** (optional, `ThirdParty/trezor-crypto`) — MIT License, для ECDSA подписи при `USE_CRYPTO_SIGN=1`
 
 ## Build
 
@@ -48,6 +49,8 @@ make flash
 **Verbose log**: `make LWIP_ALIVE_LOG=1` enables UART heartbeat ("Disp: alive", "Net: alive").
 
 **Skip OLED**: `make SKIP_OLED=1` if I2C hangs.
+
+**WebUSB**: `make USE_WEBUSB=1` enables USB device on PA11/PA12 (CN13) for Chrome WebUSB API. Linux: copy `udev/99-cryptowallet-webusb.rules` to `/etc/udev/rules.d/` and reload udev.
 
 **Boot test** (diagnostic: no FreeRTOS, LED blink only):
 ```bash

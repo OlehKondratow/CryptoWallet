@@ -49,4 +49,9 @@ nav:
   - API: api.md
   - Pinout: pinout.md
   - Architecture: architecture.md
+  - Crypto messages: crypto-messages.md
   - trezor-crypto: trezor-crypto-integration.md
+  - trezor-firmware: trezor-firmware-analysis.md
+  - Testing signing: testing-signing.md
+  - Verification (step-by-step): verification-signing.md
+  - Wallet setup: wallet-setup.md

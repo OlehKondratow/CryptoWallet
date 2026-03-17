@@ -15,6 +15,7 @@
 #include "hw_init.h"
 #include "wallet_shared.h"
 #include "task_display.h"
+#include "tx_request_validate.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "queue.h"
@@ -33,22 +34,24 @@
 #include "app_ethernet.h"
 #endif
 
-#define NET_STACK_SIZE      1024U   /* Same as lwip-uaid StartThread (256*4) */
-#define NET_PRIORITY        (tskIDLE_PRIORITY + 4)  /* Higher than Disp — init first, like StartThread */
+#define NET_STACK_SIZE      1024U
+#define NET_PRIORITY        (tskIDLE_PRIORITY + 4)
 #define HTTP_PORT           80
-#define REQ_BUF_SIZE        512U
-#define BODY_MAX            256U
+#define REQ_BUF_SIZE        1024U
+#define BODY_MAX            512U
 
 #ifdef USE_LWIP
 static struct netif g_netif;
 
 /**
- * @brief Parse JSON-like body for recipient, amount, currency.
- * @param body  Request body string.
- * @param tx    Output transaction struct.
- * @return 0 on success, -1 on parse error.
+ * @brief Parse JSON body for recipient, amount, currency.
  */
-static int parse_tx_body(const char *body, wallet_tx_t *tx);
+static int parse_tx_json(const char *body, wallet_tx_t *tx);
+
+/**
+ * @brief Parse form-urlencoded body (recipient=...&amount=...&currency=...).
+ */
+static int parse_tx_form(const char *body, size_t body_len, wallet_tx_t *tx);
 
 /**
  * @brief HTTP server thread - accept connections, handle POST /tx.
@@ -79,7 +82,7 @@ void Task_Net_Create(void)
 }
 
 #ifdef USE_LWIP
-static int parse_tx_body(const char *body, wallet_tx_t *tx)
+static int parse_tx_json(const char *body, wallet_tx_t *tx)
 {
     if (body == NULL || tx == NULL) return -1;
     memset(tx, 0, sizeof(*tx));
@@ -131,6 +134,61 @@ static int parse_tx_body(const char *body, wallet_tx_t *tx)
     return 0;
 }
 
+static int parse_tx_form(const char *body, size_t body_len, wallet_tx_t *tx)
+{
+    if (body == NULL || tx == NULL) return -1;
+    memset(tx, 0, sizeof(*tx));
+
+    static const char key_recipient[] = "recipient=";
+    static const char key_amount[] = "amount=";
+    static const char key_currency[] = "currency=";
+
+    const char *p = body;
+    const char *end = body + body_len;
+
+    while (p < end) {
+        if (strncmp(p, key_recipient, sizeof(key_recipient) - 1) == 0) {
+            p += sizeof(key_recipient) - 1;
+            const char *v_end = p;
+            while (v_end < end && *v_end != '&' && *v_end != '\0') v_end++;
+            size_t len = (size_t)(v_end - p);
+            if (len >= TX_RECIPIENT_LEN) len = TX_RECIPIENT_LEN - 1;
+            if (len > 0) {
+                memcpy(tx->recipient, p, len);
+                tx->recipient[len] = '\0';
+            }
+            p = v_end;
+        } else if (strncmp(p, key_amount, sizeof(key_amount) - 1) == 0) {
+            p += sizeof(key_amount) - 1;
+            const char *v_end = p;
+            while (v_end < end && *v_end != '&' && *v_end != '\0') v_end++;
+            size_t len = (size_t)(v_end - p);
+            if (len >= TX_AMOUNT_LEN) len = TX_AMOUNT_LEN - 1;
+            if (len > 0) {
+                memcpy(tx->amount, p, len);
+                tx->amount[len] = '\0';
+            }
+            p = v_end;
+        } else if (strncmp(p, key_currency, sizeof(key_currency) - 1) == 0) {
+            p += sizeof(key_currency) - 1;
+            const char *v_end = p;
+            while (v_end < end && *v_end != '&' && *v_end != '\0') v_end++;
+            size_t len = (size_t)(v_end - p);
+            if (len >= TX_CURRENCY_LEN) len = TX_CURRENCY_LEN - 1;
+            if (len > 0) {
+                memcpy(tx->currency, p, len);
+                tx->currency[len] = '\0';
+            }
+            p = v_end;
+        } else {
+            while (p < end && *p != '&') p++;
+        }
+        if (p < end && *p == '&') p++;
+    }
+    if (tx->currency[0] == '\0') (void)strncpy(tx->currency, "BTC", TX_CURRENCY_LEN - 1);
+    return 0;
+}
+
 static void http_server_thread(void *arg)
 {
     struct netconn *listener = NULL;
@@ -163,20 +221,95 @@ static void http_server_thread(void *arg)
             netbuf_data(inbuf, &buf, &len);
             if (buf != NULL && len > 0 && len < REQ_BUF_SIZE) {
                 char req[REQ_BUF_SIZE];
-                size_t copy = (len < REQ_BUF_SIZE - 1) ? len : REQ_BUF_SIZE - 1;
+                size_t copy = (len < REQ_BUF_SIZE - 1) ? (size_t)len : REQ_BUF_SIZE - 1;
                 memcpy(req, buf, copy);
                 req[copy] = '\0';
 
-                if (strstr(req, "POST") != NULL && strstr(req, "/tx") != NULL) {
+                int is_get = (strstr(req, "GET ") == req);
+                int is_post = (strstr(req, "POST ") == req);
+                char *path = strchr(req, ' ');
+                char *path_end = path ? strchr(path + 1, ' ') : NULL;
+                size_t path_len = path_end ? (size_t)(path_end - path - 1) : 0;
+
+                if (is_get && path != NULL && path_len >= 1) {
+                    const char *p = path + 1;
+
+                    if (path_len >= 5 && strncmp(p, "/ping", 5) == 0) {
+                        /* GET /ping — simple connectivity test */
+                        Task_Display_Log("[HTTP] GET /ping -> pong");
+                        static const char pong[] =
+                            "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+                            "Connection: close\r\nContent-Length: 4\r\n\r\npong";
+                        (void)netconn_write(conn, pong, sizeof(pong) - 1, NETCONN_COPY);
+                    } else if (path_len == 1 && p[0] == '/') {
+                        /* GET / — HTML form */
+                        Task_Display_Log("[HTTP] GET /");
+                        static const char html[] =
+                            "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                            "Connection: close\r\n\r\n"
+                            "<!DOCTYPE html><html><head><meta charset=utf-8>"
+                            "<title>CryptoWallet — Sign TX</title></head><body>"
+                            "<h1>Sign Transaction</h1>"
+                            "<form method=post action=/tx>"
+                            "<p>Recipient: <input name=recipient size=42 placeholder=1A1zP1...></p>"
+                            "<p>Amount: <input name=amount size=16 placeholder=0.001></p>"
+                            "<p>Currency: <input name=currency size=8 value=BTC></p>"
+                            "<p><button type=submit>Submit for signing</button></p>"
+                            "</form>"
+                            "<hr><h2>Last signed signature</h2>"
+                            "<p><a href=/tx/signed>Refresh</a></p>"
+                            "<pre id=sig>—</pre>"
+                            "<script>fetch('/tx/signed').then(r=>r.json()).then(d=>{"
+                            "document.getElementById('sig').textContent=d.sig||d.status||'—';"
+                            "}).catch(()=>{});</script>"
+                            "</body></html>";
+                        (void)netconn_write(conn, html, sizeof(html) - 1, NETCONN_COPY);
+                    } else if (path_len >= 10 && strncmp(p, "/tx/signed", 10) == 0) {
+                        /* GET /tx/signed — JSON with signature hex */
+                        Task_Display_Log("[HTTP] GET /tx/signed");
+                        char json[256];
+                        if (g_last_sig_ready) {
+                            char hex[132];
+                            for (int i = 0; i < 64; i++)
+                                (void)snprintf(hex + i * 2, 4, "%02X", g_last_sig[i]);
+                            hex[128] = '\0';
+                            (void)snprintf(json, sizeof(json),
+                                "{\"status\":\"signed\",\"sig\":\"%s\"}", hex);
+                        } else {
+                            (void)snprintf(json, sizeof(json),
+                                "{\"status\":\"pending\"}");
+                        }
+                        (void)snprintf(req, REQ_BUF_SIZE,
+                            "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n"
+                            "Connection: close\r\nContent-Length: %u\r\n\r\n%s",
+                            (unsigned)strlen(json), json);
+                        (void)netconn_write(conn, req, strlen(req), NETCONN_COPY);
+                    } else {
+                        Task_Display_Log("[HTTP] 404");
+                        static const char notfound[] =
+                            "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n";
+                        (void)netconn_write(conn, notfound, sizeof(notfound) - 1, NETCONN_COPY);
+                    }
+                } else if (is_post && path != NULL && path_len >= 3 &&
+                           strncmp(path + 1, "/tx", 3) == 0) {
+                    /* POST /tx */
                     char *body = strstr(req, "\r\n\r\n");
+                    wallet_tx_t tx;
+                    int parsed = 0;
                     if (body != NULL) {
                         body += 4;
-                        wallet_tx_t tx;
-                        if (parse_tx_body(body, &tx) == 0) {
-                            if (xQueueSend(g_tx_queue, &tx, pdMS_TO_TICKS(100)) == pdTRUE) {
-                                Task_Display_Log("TX enqueued");
-                            }
-                            /* Push to Display queue: Transaction_Data_t */
+                        size_t body_len = (size_t)(req + copy - body);
+                        if (strstr(req, "application/json") != NULL) {
+                            parsed = (parse_tx_json(body, &tx) == 0);
+                        } else {
+                            parsed = (parse_tx_form(body, body_len, &tx) == 0);
+                        }
+                    }
+                    if (parsed) {
+                        if (tx_request_validate(&tx) != TX_VALID_OK) {
+                            Task_Display_Log("[HTTP] TX invalid");
+                        } else if (xQueueSend(g_tx_queue, &tx, pdMS_TO_TICKS(100)) == pdTRUE) {
+                            Task_Display_Log("TX enqueued");
                             Transaction_Data_t disp_tx;
                             memset(&disp_tx, 0, sizeof(disp_tx));
                             (void)snprintf(disp_tx.coin_name, sizeof(disp_tx.coin_name), "%s",
@@ -186,13 +319,23 @@ static void http_server_thread(void *arg)
                             disp_tx.is_pending = 1;
                             (void)xQueueSend(g_display_queue, &disp_tx, pdMS_TO_TICKS(100));
                         }
+                    } else {
+                        Task_Display_Log("[HTTP] POST /tx invalid body");
                     }
+                    static const char resp[] =
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
+                        "Connection: close\r\n\r\n"
+                        "<!DOCTYPE html><html><head><meta charset=utf-8>"
+                        "<meta http-equiv=refresh content=2;url=/>"
+                        "</head><body><p>Transaction submitted. Confirm on device. "
+                        "<a href=/>Back</a></p></body></html>";
+                    (void)netconn_write(conn, resp, sizeof(resp) - 1, NETCONN_COPY);
+                } else {
+                    static const char resp[] =
+                        "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+                        "Connection: close\r\nContent-Length: 2\r\n\r\nOK";
+                    (void)netconn_write(conn, resp, sizeof(resp) - 1, NETCONN_COPY);
                 }
-
-                static const char resp[] =
-                    "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
-                    "Connection: close\r\nContent-Length: 2\r\n\r\nOK";
-                (void)netconn_write(conn, resp, sizeof(resp) - 1, NETCONN_COPY);
             }
             netbuf_delete(inbuf);
         }
@@ -251,7 +394,7 @@ static void net_task(void *pvParameters)
         xSemaphoreGive(g_display_ctx_mutex);
     }
 
-    sys_thread_new("HTTP", http_server_thread, NULL, 2048, 2);  /* 2048 stack for HTTP request handling */
+    sys_thread_new("HTTP", http_server_thread, NULL, 16384, 2);  /* 16K stack for HTTP (was 2K, 8x increase) */
     Task_Display_Log("Net: HTTP ready");
 
 #if LWIP_ALIVE_LOG

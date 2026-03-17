@@ -90,6 +90,11 @@ extern SemaphoreHandle_t g_display_ctx_mutex;
 /** @brief Set by task_security when alert condition (e.g. sign error). */
 extern volatile uint8_t  g_security_alert;
 
+/** @brief Last signed signature (64 bytes), set by task_sign on success. */
+extern uint8_t  g_last_sig[64];
+/** @brief 1 = g_last_sig valid, 0 = no recent signature. */
+extern volatile uint8_t  g_last_sig_ready;
+
 #ifdef __cplusplus
 }
 #endif
