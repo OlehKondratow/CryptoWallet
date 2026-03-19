@@ -170,7 +170,9 @@ docs-doxygen:
 	@$(PYTHON3) scripts/update_readme.py
 	@$(PYTHON3) scripts/update_readme.py --md-dir docs_doxygen/md
 	@$(PYTHON3) scripts/update_docs_src_index.py
+	@$(PYTHON3) scripts/generate_readme_languages.py
 	@echo "Doxygen: docs_doxygen/html, docs_doxygen/xml; README sections updated (Project Structure + docs_src index); docs_doxygen/md/*.md"
+	@echo "README: Generated in English, Russian, Polish (README.md, README_ru.md, README_pl.md)"
 
 # Serve docs locally (live reload)
 docs-serve:

@@ -1,6 +1,6 @@
 # CryptoWallet
 
-Aplikacja mikrokontrolera do bezpiecznego podpisywania transakcji Bitcoin na STM32H743. Integruje trezor-crypto, FreeRTOS, LwIP, UI SSD1306 i WebUSB.
+Aplikacja mikrokontrolera do bezpiecznego podpisywania transakcji Bitcoin na STM32H743. Integruje trezor-crypto, FreeRTOS, LwIP, SSD1306 UI i WebUSB.
 
 **Dokumentacja dostępna w:**
 - 🇬🇧 [English](README.md)
@@ -9,204 +9,204 @@ Aplikacja mikrokontrolera do bezpiecznego podpisywania transakcji Bitcoin na STM
 
 ---
 
-## 🔐 Core & Security (Jądro i Bezpieczeństwo)
+## 🔐 Jądro i bezpieczeństwo
 
-Główna logika podpisywania, zarządzanie kluczami, walidacja i operacje kryptograficzne.
+Logika podpisywania, zarządzanie kluczami, walidacja i operacje kryptograficzne.
 
-### [main.c](Core/Src/main.c) — Punkt wejścia i zarządzanie aplikacją
-Punkt wejścia FreeRTOS: inicjalizacja obiektów IPC (kolejki, semafory, grupy zdarzeń), tworzenie i uruchamianie zadań krytycznych.
+### [main.c](Core/Src/main.c) — Entry point and application management
+FreeRTOS entry point: initialization of IPC objects (queues, semaphores, event groups), creation and startup of critical tasks.
 **Pełna dokumentacja:** [docs_src/main.md](docs_src/main.md)
 
-### [task_sign.c](Core/Src/task_sign.c) — Pipeline podpisywania (FSM)
-Główna funkcja: walidacja żądania z kolejki, utworzenie SHA-256, oczekiwanie na potwierdzenie użytkownika, podpis ECDSA, zapisanie wyniku.
+### [task_sign.c](Core/Src/task_sign.c) — Signing pipeline (FSM)
+The workhorse: validates request from queue, forms SHA-256, awaits user confirmation, ECDSA signature, saves result.
 **Pełna dokumentacja:** [docs_src/task_sign.md](docs_src/task_sign.md)
 
-### [crypto_wallet.c](Core/Src/crypto_wallet.c) — Warstwa kryptograficzna (trezor-crypto)
-Wrapper nad trezor-crypto: STM32 RNG + mieszanie entropii, mnemoniki BIP-39, pochodna HD BIP-32 (m/44'/0'/0'/0/0), ECDSA secp256k1.
+### [crypto_wallet.c](Core/Src/crypto_wallet.c) — Cryptographic layer (trezor-crypto)
+Wrapper over trezor-crypto: STM32 RNG + entropy pooling, BIP-39 mnemonics, BIP-32 HD derivation (m/44'/0'/0'/0/0), ECDSA secp256k1.
 **Pełna dokumentacja:** [docs_src/crypto_wallet.md](docs_src/crypto_wallet.md)
 
-### [tx_request_validate.c](Core/Src/tx_request_validate.c) — Brama walidacji
-Warstwa ochronna przed podpisywaniem: walidacja adresu (Base58/bech32), kwoty (decimal), waluty (whitelist).
+### [tx_request_validate.c](Core/Src/tx_request_validate.c) — Validation gate
+Guardian layer before signing: validates address (Base58/bech32), amount (decimal), currency (whitelist).
 **Pełna dokumentacja:** [docs_src/tx_request_validate.md](docs_src/tx_request_validate.md)
 
-### [memzero.c](Core/Src/memzero.c) — Bezpieczne zerowanie
-Niszczenie wrażliwych buforów (klucze, skróty, ziarna) za pośrednictwem zapisów volatile, ochrona przed optymalizacją kompilatora.
+### [memzero.c](Core/Src/memzero.c) — Secure zeroing
+Destructs sensitive buffers (keys, digests, seeds) via volatile writes, preventing compiler optimization.
 **Pełna dokumentacja:** [docs_src/memzero.md](docs_src/memzero.md)
 
-### [sha256_minimal.c](Core/Src/sha256_minimal.c) — Rezerwa SHA-256
-Kompaktna implementacja SHA-256 (gdy `USE_CRYPTO_SIGN=0` bez trezor-crypto).
+### [sha256_minimal.c](Core/Src/sha256_minimal.c) — SHA-256 fallback
+Compact SHA-256 implementation (when `USE_CRYPTO_SIGN=0` without trezor-crypto).
 **Pełna dokumentacja:** [docs_src/sha256_minimal.md](docs_src/sha256_minimal.md)
 
-### [wallet_seed.c](Core/Src/wallet_seed.c) — Zarządzanie ziarnem (test)
-Ziarno testowe do programowania (`USE_TEST_SEED=1`): wektor BIP-39 "abandon...about", **tylko do programowania**.
+### [wallet_seed.c](Core/Src/wallet_seed.c) — Seed management (test)
+Test seed for development (`USE_TEST_SEED=1`): BIP-39 vector "abandon...about", **development only**.
 **Pełna dokumentacja:** [docs_src/wallet_seed.md](docs_src/wallet_seed.md)
 
-### [task_security.c](Core/Src/task_security.c) — Starsze podpisywanie (audit/test)
-Alternatywny FSM podpisywania z fikcyjną kryptografią do bring-up i porównania.
+### [task_security.c](Core/Src/task_security.c) — Legacy signing (audit/test)
+Alternative signing FSM with mock cryptography for bring-up and comparison.
 **Pełna dokumentacja:** [docs_src/task_security.md](docs_src/task_security.md)
 
 **Nagłówki:** crypto_wallet.h, memzero.h, sha256_minimal.h, task_sign.h, task_security.h, tx_request_validate.h, wallet_shared.h
 
 ---
 
-## 📡 Communication Interfaces (Interfejsy komunikacji)
+## 📡 Interfejsy komunikacyjne
 
 Stos sieciowy (LwIP/Ethernet), USB (WebUSB), synchronizacja czasu.
 
-### [task_net.c](Src/task_net.c) — Serwer HTTP i API sieciowy
-Uruchomienie LwIP/Ethernet, HTTP na porcie 80, parsowanie JSON/form `POST /tx`, walidacja, enqueue do `g_tx_queue`.
+### [task_net.c](Src/task_net.c) — HTTP server and network API
+LwIP/Ethernet startup, HTTP on port 80, JSON/form `POST /tx` parsing, validation, enqueue to `g_tx_queue`.
 **Pełna dokumentacja:** [docs_src/task_net.md](docs_src/task_net.md)
 
-### [usb_webusb.c](Core/Src/usb_webusb.c) — Interfejs dostawcy WebUSB
-WebUSB właściwy dla dostawcy: punkty końcowe zbiorcze, ping/pong, rama binarna do żądania podpisu.
+### [usb_webusb.c](Core/Src/usb_webusb.c) — WebUSB vendor interface
+Vendor-specific WebUSB: bulk endpoints, ping/pong, binary frame for signature request.
 **Pełna dokumentacja:** [docs_src/usb_webusb.md](docs_src/usb_webusb.md)
 
-### [app_ethernet_cw.c](Src/app_ethernet_cw.c) — Połączenie Ethernet i FSM DHCP
-Callback połączenia Ethernet dla up/down, maszyna stanu DHCP (START → WAIT_ADDRESS → ASSIGNED/TIMEOUT), sprzężenie zwrotne LED.
+### [app_ethernet_cw.c](Src/app_ethernet_cw.c) — Ethernet link and DHCP FSM
+Ethernet link callback for up/down, DHCP state machine (START → WAIT_ADDRESS → ASSIGNED/TIMEOUT), LED feedback.
 **Pełna dokumentacja:** [docs_src/app_ethernet_cw.md](docs_src/app_ethernet_cw.md)
 
-### [time_service.c](Core/Src/time_service.c) — SNTP i UTC
-Synchronizacja czasu za pośrednictwem SNTP, ujednolicony dostęp do epoki Unix i ciągów UTC.
+### [time_service.c](Core/Src/time_service.c) — SNTP and UTC
+Time synchronization via SNTP, unified access to Unix epoch and UTC strings.
 **Pełna dokumentacja:** [docs_src/time_service.md](docs_src/time_service.md)
 
-### [usb_device.c](Core/Src/usb_device.c) — Inicjalizacja urządzenia USB
-Konfiguracja zegara HSI48, inicjalizacja rdzenia USBD, rejestracja klasy WebUSB.
+### [usb_device.c](Core/Src/usb_device.c) — USB device initialization
+HSI48 clock configuration, USBD core initialization, WebUSB class registration.
 **Pełna dokumentacja:** [docs_src/usb_device.md](docs_src/usb_device.md)
 
-### [usbd_conf_cw.c](Core/Src/usbd_conf_cw.c) — Konfiguracja BSP USB
-Statyczny alokatora dla USBD, MSP dla PCD (GPIO AF, zegar, NVIC), łączenie HAL_PCD do USBD_LL.
+### [usbd_conf_cw.c](Core/Src/usbd_conf_cw.c) — USB BSP configuration
+Static allocator for USBD, MSP for PCD (GPIO AF, clock, NVIC), HAL_PCD bridging to USBD_LL.
 **Pełna dokumentacja:** [docs_src/usbd_conf_cw.md](docs_src/usbd_conf_cw.md)
 
-### [usbd_desc_cw.c](Core/Src/usbd_desc_cw.c) — Deskryptory USB
-Deskryptory Device/interface/BOS, ciągi (producent, produkt, seria), UUID WebUSB Platform Capability.
+### [usbd_desc_cw.c](Core/Src/usbd_desc_cw.c) — USB descriptors
+Device/interface/BOS descriptors, strings (manufacturer, product, serial), WebUSB Platform Capability UUID.
 **Pełna dokumentacja:** [docs_src/usbd_desc_cw.md](docs_src/usbd_desc_cw.md)
 
 **Nagłówki:** task_net.h, usb_device.h, usb_webusb.h, usbd_conf.h, usbd_conf_cw.h, usbd_desc_cw.h, app_ethernet.h, time_service.h, lwipopts.h
 
 ---
 
-## 🎨 User Experience (Interfejs użytkownika)
+## 🎨 Doświadczenie użytkownika
 
 Zarządzanie wyświetlaczem, obsługa przycisków, zdarzenia systemowe i wskaźniki.
 
-### [task_display.c](Core/Src/task_display.c) — UI SSD1306 (pełna wersja)
-Zarządzanie stanem wizualnym na SSD1306 128×32: 4 linie, przewijający się dziennik, łączenie stanu.
+### [task_display.c](Core/Src/task_display.c) — SSD1306 UI (full version)
+Visual state management on SSD1306 128×32: 4 lines, scrolling log, state merging.
 **Pełna dokumentacja:** [docs_src/task_display.md](docs_src/task_display.md)
 
-### [task_display_minimal.c](Core/Src/task_display_minimal.c) — UI SSD1306 (minimalny)
-Minimalny UI dla `minimal-lwip`: lustrzane odbicie UART, okresowe aktualizacje wyświetlacza.
+### [task_display_minimal.c](Core/Src/task_display_minimal.c) — SSD1306 UI (minimal)
+Minimal UI for `minimal-lwip`: UART mirroring, periodic display updates.
 **Pełna dokumentacja:** [docs_src/task_display_minimal.md](docs_src/task_display_minimal.md)
 
-### [task_user.c](Core/Src/task_user.c) — Przycisk użytkownika (PC13)
-Fizyczny UX: tłumienie drgań, krótkie naciśnięcie (Potwierdź) vs długie przytrzymanie ~2,5s (Odrzuć).
+### [task_user.c](Core/Src/task_user.c) — User button (PC13)
+Physical UX: debouncing, short press (Confirm) vs long hold ~2.5s (Reject).
 **Pełna dokumentacja:** [docs_src/task_user.md](docs_src/task_user.md)
 
-### [task_io.c](Core/Src/task_io.c) — Wskaźniki LED
-Wskaźniki wizualne: LED1 = puls aktywności, LED2 = aktywność sieciowa, LED3 = alert bezpieczeństwa.
+### [task_io.c](Core/Src/task_io.c) — LED indicators
+Visual indicators: LED1 = alive heartbeat, LED2 = network activity, LED3 = security alert.
 **Pełna dokumentacja:** [docs_src/task_io.md](docs_src/task_io.md)
 
 **Nagłówki:** task_display.h, task_user.h, task_io.h
 
 ---
 
-## ⚙️ System & Hardware (System i Sprzęt)
+## ⚙️ System i sprzęt
 
 Inicjalizacja HAL, taktowanie, procedury obsługi przerwań, konfiguracja sterownika.
 
-### [hw_init.c](Core/Src/hw_init.c) — Uruchomienie płyty (zegary, MPU, GPIO, I2C, UART)
-Bootstrap niskiego poziomu: konfiguracja zegara, MPU/pamięć podręczna (dla LwIP), GPIO (LED, przycisk), I2C1 (OLED), UART, USB, RNG.
+### [hw_init.c](Core/Src/hw_init.c) — Board bring-up (clocks, MPU, GPIO, I2C, UART)
+Low-level bootstrap: clock configuration, MPU/cache (for LwIP), GPIO (LED, button), I2C1 (OLED), UART, USB, RNG.
 **Pełna dokumentacja:** [docs_src/hw_init.md](docs_src/hw_init.md)
 
-### [stm32h7xx_hal_msp.c](Core/Src/stm32h7xx_hal_msp.c) — Callbacki HAL MSP
-Konfiguracja poziomu sprzętowego: `HAL_I2C_MspInit` (I2C1), `HAL_UART_MspInit` (USART3).
+### [stm32h7xx_hal_msp.c](Core/Src/stm32h7xx_hal_msp.c) — HAL MSP callbacks
+Hardware-level configuration: `HAL_I2C_MspInit` (I2C1), `HAL_UART_MspInit` (USART3).
 **Pełna dokumentacja:** [docs_src/stm32h7xx_hal_msp.md](docs_src/stm32h7xx_hal_msp.md)
 
-### [stm32h7xx_it.c](Core/Src/stm32h7xx_it.c) — Procedury obsługi przerwań (główne)
-Procedury obsługi: `SysTick_Handler` (znacznik czasu FreeRTOS), IRQ Ethernet (gdy `USE_LWIP`).
+### [stm32h7xx_it.c](Core/Src/stm32h7xx_it.c) — Interrupt handlers (main)
+Handlers: `SysTick_Handler` (FreeRTOS tick), Ethernet IRQ (when `USE_LWIP`).
 **Pełna dokumentacja:** [docs_src/stm32h7xx_it.md](docs_src/stm32h7xx_it.md)
 
-### [stm32h7xx_it_systick.c](Core/Src/stm32h7xx_it_systick.c) — SysTick dla minimal-lwip
-Alternatywny `SysTick_Handler` dla kompilacji `minimal-lwip`.
+### [stm32h7xx_it_systick.c](Core/Src/stm32h7xx_it_systick.c) — SysTick for minimal-lwip
+Alternative `SysTick_Handler` for `minimal-lwip` build.
 **Pełna dokumentacja:** [docs_src/stm32h7xx_it_systick.md](docs_src/stm32h7xx_it_systick.md)
 
-### [stm32h7xx_it_usb.c](Core/Src/stm32h7xx_it_usb.c) — IRQ USB OTG HS
-Procedura obsługi przerwania OTG HS: wywołuje `HAL_PCD_IRQHandler` dla WebUSB.
+### [stm32h7xx_it_usb.c](Core/Src/stm32h7xx_it_usb.c) — USB OTG HS IRQ
+OTG HS interrupt handler: calls `HAL_PCD_IRQHandler` for WebUSB.
 **Pełna dokumentacja:** [docs_src/stm32h7xx_it_usb.md](docs_src/stm32h7xx_it_usb.md)
 
-### [ssd1306_conf.h](Drivers/ssd1306/ssd1306_conf.h) — Konfiguracja sterownika wyświetlacza
-Parametry czasu kompilacji: powiązanie I2C1, adres 0x3C, geometria 128×32, czcionka 6×8.
+### [ssd1306_conf.h](Drivers/ssd1306/ssd1306_conf.h) — Display driver configuration
+Build-time parameters: I2C1 binding, address 0x3C, geometry 128×32, font 6×8.
 **Pełna dokumentacja:** [docs_src/ssd1306_conf.md](docs_src/ssd1306_conf.md)
 
 **Nagłówki:** hw_init.h, main.h, lwipopts.h
 
 ---
 
-## 📚 Dokumentacja i odniesienia
+## 📚 Dokumentacja i materiały referencyjne
 
-- **[docs_src/README.md](docs_src/README.md)** — Kompletny indeks wszystkich 32 modułów z hierarchiczną nawigacją
-- **[docs_src/doxygen-comments.md](docs_src/doxygen-comments.md)** — Wytyczne stylu komentarza Doxygen
-- **[docs_src/api-documentation-scope.md](docs_src/api-documentation-scope.md)** — Śledzenie postępu dokumentacji
+- **[docs_src/README.md](docs_src/README.md)** — Complete index of all 32 modules with hierarchical navigation
+- **[docs_src/doxygen-comments.md](docs_src/doxygen-comments.md)** — Doxygen comment style guidelines
+- **[docs_src/api-documentation-scope.md](docs_src/api-documentation-scope.md)** — Documentation progress tracking
 
 ---
 
 ## 🚀 Szybki start
 
 ### Struktura dokumentacji
-1. **Kod (.c/.h)** — minimalny @brief/@details, poziom API
-2. **docs_src/*.md** — szczegółowe wyjaśnienia logiki (Abstrakt → Przepływ logiki → Zależności)
+1. **Kod (.c/.h)** — minimalne @brief/@details, poziom API
+2. **docs_src/*.md** — szczegółowe wyjaśnienia logiki (Abstract → Logic Flow → Dependencies)
 3. **Doxygen HTML** — odsyłacze krzyżowe kodu (`make docs-doxygen`)
 
-### Jak przeczytać moduł
-1. Otwórz [docs_src/README.md](docs_src/README.md)
+### Jak czytać moduł
+1. Open [docs_src/README.md](docs_src/README.md)
 2. Znajdź interesujący Cię moduł
-3. Zacznij od **Abstraktu** (logika biznesowa) → **Przepływ logiki** (algorytm) → **Zależności**
-4. Obserwuj **Relacje** w celu uzyskania szerszego kontekstu
+3. Zacznij od **Abstract** (logika biznesowa) → **Logic Flow** (algorytm) → **Dependencies**
+4. Śledź **Relations** dla szerszego kontekstu
 
 ### Główne polecenia
 ```bash
-make docs-doxygen    # Wygeneruj Doxygen
-make build          # Zbuduj
-make minimal-lwip   # Minimalna kompilacja
-make flash          # Wgraj na STM32
+make docs-doxygen    # Generate Doxygen
+make build          # Build
+make minimal-lwip   # Minimal build
+make flash          # Flash to STM32
 ```
 
 ---
 
-## 📋 Kompletny indeks modułów
+## 📋 Pełny indeks modułów
 
 <!-- DOXYGEN_DOCS_SRC_INDEX -->
-| Moduł | Krótki przegląd |
+| Module | Brief Overview |
 |--------|------------------|
-| [api-documentation-scope](docs_src/api-documentation-scope.md) | Śledzenie postępu dokumentacji i zakresu pokrycia Doxygen dla wszystkich modułów. |
-| [app_ethernet](docs_src/app_ethernet.md) | Plik nagłówka definiujący interfejsy warstwy „uszczelki" Ethernet: callback połączenia, stałe FSM DHCP. |
-| [app_ethernet_cw](docs_src/app_ethernet_cw.md) | Obsługa Ethernet: FSM up/down, maszyna stanu DHCP (START → WAIT_ADDRESS → ASSIGNED/TIMEOUT), sprzężenie zwrotne LED. |
-| [crypto_wallet](docs_src/crypto_wallet.md) | Opakowuje bibliotekę trezor-crypto: STM32 RNG z mieszaniem entropii, BIP-39, pochodna HD BIP-32, podpis ECDSA secp256k1. |
-| [doxygen-comments](docs_src/doxygen-comments.md) | Wytyczne stylu komentarza Doxygen: separacja @brief/@details w kodzie. |
-| [hw_init](docs_src/hw_init.md) | Uruchomienie płyty: konfiguracja zegara, MPU/pamięć podręczna (dla LwIP), GPIO, I2C1, UART, USB, inicjalizacja RNG. |
-| [lwipopts](docs_src/lwipopts.md) | Konfiguracja czasu kompilacji LwIP: IPv4/TCP/DHCP/DNS/SNTP, parametry sterty, bufory/okno TCP. |
-| [main](docs_src/main.md) | Punkt wejścia FreeRTOS i aranżacja aplikacji. |
-| [memzero](docs_src/memzero.md) | Bezpieczne zerowanie buforu przy użyciu zapisów volatile, aby zapobiec optymalizacji kompilatora. |
-| [README](docs_src/README.md) | Kompletny indeks 32 modułów z hierarchiczną nawigacją i metodologią dokumentacji. |
-| [sha256_minimal](docs_src/sha256_minimal.md) | Kompaktna implementacja SHA-256 dla kompilacji minimalnych (USE_CRYPTO_SIGN=0). |
-| [ssd1306_conf](docs_src/ssd1306_conf.md) | Konfiguracja czasu kompilacji sterownika wyświetlacza. |
-| [stm32h7xx_hal_msp](docs_src/stm32h7xx_hal_msp.md) | Callbacki HAL MSP dla konfiguracji sprzętu I2C1 i USART3. |
-| [stm32h7xx_it](docs_src/stm32h7xx_it.md) | Procedury obsługi przerwań: SysTick (znacznik czasu FreeRTOS), IRQ Ethernet. |
-| [stm32h7xx_it_systick](docs_src/stm32h7xx_it_systick.md) | Alternatywna procedura obsługi SysTick dla kompilacji minimal-lwip. |
-| [stm32h7xx_it_usb](docs_src/stm32h7xx_it_usb.md) | Procedura obsługi przerwania USB OTG HS dla WebUSB. |
-| [task_display](docs_src/task_display.md) | Zarządzanie UI SSD1306: wyświetlacz 4-liniowy, przewijający się dziennik, łączenie stanu. |
-| [task_display_minimal](docs_src/task_display_minimal.md) | Minimalny UI dla minimal-lwip: lustrzane odbicie UART, zmniejszone obciążenie SSD1306. |
-| [task_io](docs_src/task_io.md) | Zadanie wskaźnika LED: puls aktywności, aktywność sieciowa, alerty bezpieczeństwa. |
-| [task_net](docs_src/task_net.md) | Serwer HTTP i API sieciowy: LwIP/Ethernet, port 80, parsowanie i walidacja POST /tx. |
-| [task_security](docs_src/task_security.md) | Starsze FSM podpisywania z fikcyjną kryptografią (tylko test/audit). |
-| [task_sign](docs_src/task_sign.md) | Główny pipeline podpisywania: konsument kolejki, tworzenie SHA-256, potwierdzenie użytkownika, podpis ECDSA. |
-| [task_user](docs_src/task_user.md) | Obsługa przycisku użytkownika: tłumienie drgań, rozróżnienie krótkie/długie naciśnięcie, sygnalizacja potwierdź/odrzuć. |
-| [time_service](docs_src/time_service.md) | Synchronizacja czasu SNTP i formatowanie ciągu UTC. |
-| [tx_request_validate](docs_src/tx_request_validate.md) | Brama walidacji danych wejściowych: weryfikacja adresu (Base58/bech32), kwoty (decimal), waluty (whitelist). |
-| [usb_device](docs_src/usb_device.md) | Inicjalizacja urządzenia USB: zegar HSI48, rdzeń USBD, rejestracja klasy WebUSB. |
-| [usb_webusb](docs_src/usb_webusb.md) | Interfejs dostawcy WebUSB: punkty końcowe zbiorcze, ping/pong, żądanie/odpowiedź podpisu binarnego. |
-| [usbd_conf](docs_src/usbd_conf.md) | Wrapper konfiguracji urządzenia USB. |
-| [usbd_conf_cw](docs_src/usbd_conf_cw.md) | Konfiguracja BSP USB dla CryptoWallet WebUSB. |
-| [usbd_desc_cw](docs_src/usbd_desc_cw.md) | Deskryptory urządzenia USB dla WebUSB. |
-| [wallet_seed](docs_src/wallet_seed.md) | Zaślepka ziarna testowego (USE_TEST_SEED=1, tylko programowanie). |
-| [wallet_shared](docs_src/wallet_shared.md) | Wspólne typy IPC, struktury i kontrakty globalnych obiektów. |
+| [api-documentation-scope](docs_src/api-documentation-scope.md) | Tracking documentation progress and Doxygen coverage for all modules. |
+| [app_ethernet](docs_src/app_ethernet.md) | Header file defining Ethernet "glue" layer interfaces: link callback, DHCP FSM constants. |
+| [app_ethernet_cw](docs_src/app_ethernet_cw.md) | Ethernet support: link-up/down FSM, DHCP state machine (START → WAIT_ADDRESS → ASSIGNED/TIMEOUT), LED feedback. |
+| [crypto_wallet](docs_src/crypto_wallet.md) | Wraps trezor-crypto library: STM32 RNG with entropy pooling, BIP-39, BIP-32 HD derivation, ECDSA secp256k1 signing. |
+| [doxygen-comments](docs_src/doxygen-comments.md) | Guidelines for Doxygen comment style: @brief/@details separation in code. |
+| [hw_init](docs_src/hw_init.md) | Board bring-up: clock configuration, MPU/cache (for LwIP), GPIO, I2C1, UART, USB, RNG initialization. |
+| [lwipopts](docs_src/lwipopts.md) | LwIP compile-time configuration: IPv4/TCP/DHCP/DNS/SNTP, heap parameters, TCP buffers/window. |
+| [main](docs_src/main.md) | FreeRTOS entry point and application orchestration. |
+| [memzero](docs_src/memzero.md) | Secure buffer zeroing using volatile writes to prevent compiler optimization. |
+| [README](docs_src/README.md) | Complete index of 32 modules with hierarchical navigation and documentation methodology. |
+| [sha256_minimal](docs_src/sha256_minimal.md) | Compact SHA-256 implementation for minimal builds (USE_CRYPTO_SIGN=0). |
+| [ssd1306_conf](docs_src/ssd1306_conf.md) | Display driver build-time configuration. |
+| [stm32h7xx_hal_msp](docs_src/stm32h7xx_hal_msp.md) | HAL MSP callbacks for I2C1 and USART3 hardware configuration. |
+| [stm32h7xx_it](docs_src/stm32h7xx_it.md) | Interrupt handlers: SysTick (FreeRTOS tick), Ethernet IRQ. |
+| [stm32h7xx_it_systick](docs_src/stm32h7xx_it_systick.md) | Alternative SysTick handler for minimal-lwip build. |
+| [stm32h7xx_it_usb](docs_src/stm32h7xx_it_usb.md) | USB OTG HS interrupt handler for WebUSB. |
+| [task_display](docs_src/task_display.md) | SSD1306 UI management: 4-line display, scrolling log, state merging. |
+| [task_display_minimal](docs_src/task_display_minimal.md) | Minimal UI for minimal-lwip: UART mirroring, reduced SSD1306 load. |
+| [task_io](docs_src/task_io.md) | LED indicator task: alive heartbeat, network activity, security alerts. |
+| [task_net](docs_src/task_net.md) | HTTP server and network API: LwIP/Ethernet, port 80, POST /tx parsing and validation. |
+| [task_security](docs_src/task_security.md) | Legacy signing FSM with mock cryptography (test/audit only). |
+| [task_sign](docs_src/task_sign.md) | Main signing pipeline: queue consumer, SHA-256 forming, user confirmation, ECDSA signature. |
+| [task_user](docs_src/task_user.md) | User button handling: debouncing, short/long press distinction, confirm/reject signaling. |
+| [time_service](docs_src/time_service.md) | SNTP time synchronization and UTC string formatting. |
+| [tx_request_validate](docs_src/tx_request_validate.md) | Input validation gate: address (Base58/bech32), amount (decimal), currency (whitelist) verification. |
+| [usb_device](docs_src/usb_device.md) | USB device initialization: HSI48 clock, USBD core, WebUSB class registration. |
+| [usb_webusb](docs_src/usb_webusb.md) | WebUSB vendor interface: bulk endpoints, ping/pong, binary signature request/response. |
+| [usbd_conf](docs_src/usbd_conf.md) | USB device configuration wrapper. |
+| [usbd_conf_cw](docs_src/usbd_conf_cw.md) | USB BSP configuration for CryptoWallet WebUSB. |
+| [usbd_desc_cw](docs_src/usbd_desc_cw.md) | USB device descriptors for WebUSB. |
+| [wallet_seed](docs_src/wallet_seed.md) | Test seed stub (USE_TEST_SEED=1, development only). |
+| [wallet_shared](docs_src/wallet_shared.md) | Shared IPC types, structures, and global object contracts. |
 <!-- /DOXYGEN_DOCS_SRC_INDEX -->
