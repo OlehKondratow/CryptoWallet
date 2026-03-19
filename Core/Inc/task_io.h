@@ -16,9 +16,9 @@ extern "C" {
 #endif
 
 /**
- * @brief Create and start the IO task.
- * @note  Call from main() before vTaskStartScheduler().
- * @return None.
+ * @brief   Create LED “heartbeat / alert” task (no button handling).
+ * @details Periodically updates LED1 always-on, LED2 toggle when @c USE_LWIP is off,
+ *          LED3 from @c g_security_alert . Stack 128, priority idle+1.
  */
 void Task_IO_Create(void);
 

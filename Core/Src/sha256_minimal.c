@@ -1,9 +1,11 @@
 /**
   ******************************************************************************
   * @file    sha256_minimal.c
-  * @brief   Minimal SHA-256 for USE_CRYPTO_SIGN=0 (no trezor-crypto).
+  * @brief   SHA-256 only — used when USE_CRYPTO_SIGN=0 (no trezor-crypto).
   ******************************************************************************
-  * @details Public domain implementation. Used when trezor-crypto not in build.
+  * @details
+  *          Public-domain compact implementation. Signing path with full crypto uses
+  *          trezor-crypto sha2.c instead. **Headers:** sha256_minimal.h .
   ******************************************************************************
   */
 

@@ -1,10 +1,12 @@
 /**
   ******************************************************************************
   * @file    tx_request_validate.c
-  * @brief   Request analysis and validation — original implementation.
+  * @brief   Validate host-supplied recipient / amount / currency before signing.
   ******************************************************************************
-  * @details No code copied from trezor-firmware. Validates recipient, amount,
-  *          currency for crypto transaction signing requests.
+  * @details
+  *          Whitelist currencies, Base58 checks for BTC-style addresses, numeric
+  *          amount rules. Used from task_net.c (HTTP), usb_webusb.c (WebUSB), and
+  *          task_sign.c. **Messages:** docs_src/crypto-messages.md .
   ******************************************************************************
   */
 
@@ -14,6 +16,7 @@
 #include <stdlib.h>
 #include <ctype.h>
 
+/** @brief Case-insensitive ASCII equality for currency tickers. */
 static int str_eq_ignore_case(const char *a, const char *b)
 {
     while (*a && *b) {
@@ -29,7 +32,7 @@ static const char * const SUPPORTED_CURRENCIES[] = {
 };
 #define SUPPORTED_COUNT (sizeof(SUPPORTED_CURRENCIES) / sizeof(SUPPORTED_CURRENCIES[0]))
 
-/* Bitcoin address: base58 alphabet (no 0, O, I, l) */
+/** @brief Return true if @a c is in Bitcoin Base58 alphabet (excludes 0,O,I,l). */
 static bool is_base58_char(char c)
 {
     if (c >= '1' && c <= '9') return true;
@@ -41,6 +44,7 @@ static bool is_base58_char(char c)
     return false;
 }
 
+/** @copydoc tx_recipient_format_ok */
 bool tx_recipient_format_ok(const char *recipient)
 {
     if (recipient == NULL) return false;
@@ -69,6 +73,7 @@ bool tx_recipient_format_ok(const char *recipient)
     return true;
 }
 
+/** @copydoc tx_amount_format_ok */
 bool tx_amount_format_ok(const char *amount)
 {
     if (amount == NULL || amount[0] == '\0') return false;
@@ -102,6 +107,7 @@ bool tx_currency_supported(const char *currency)
     return false;
 }
 
+/** @copydoc tx_request_validate */
 tx_validate_result_t tx_request_validate(const wallet_tx_t *tx)
 {
     if (tx == NULL) return TX_VALID_ERR_NULL_PTR;
@@ -124,6 +130,7 @@ tx_validate_result_t tx_request_validate(const wallet_tx_t *tx)
     return TX_VALID_OK;
 }
 
+/** @copydoc tx_validate_result_str */
 const char *tx_validate_result_str(tx_validate_result_t result)
 {
     switch (result) {

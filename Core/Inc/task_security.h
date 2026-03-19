@@ -1,11 +1,12 @@
 /**
   ******************************************************************************
   * @file    task_security.h
-  * @brief   Security module - transaction decode, User Key (PC13) confirm, signing.
+  * @brief   Header for legacy @c task_security.c (mock crypto FSM).
   ******************************************************************************
-  * @details Decodes transactions (Recipient, Amount). Integrates with User Key
-  *          for physical Confirm. Mock SHA256/signing (H7 HASH/PKA placeholders).
-  *          Receives tx from task_net via g_tx_queue; User Confirmed from task_io.
+  * @details
+  *          **Not started from @c main.c** — see @c task_sign.c for the queue consumer
+  *          fed by @c task_net . USER events come from @c task_user.c via
+  *          @c g_user_event_group . Mock SHA256/ECDSA here vs real trezor path in sign task.
   ******************************************************************************
   */
 

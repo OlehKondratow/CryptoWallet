@@ -1,0 +1,86 @@
+# Doxyfile for CryptoWallet — C sources, XML + HTML output
+# Note: Doxygen has no GENERATE_MARKDOWN; we use XML + scripts for Markdown and README.
+
+PROJECT_NAME           = "CryptoWallet"
+PROJECT_NUMBER         =
+PROJECT_BRIEF          = "FreeRTOS firmware for Secure Crypto Wallet on STM32H743ZI2"
+OUTPUT_DIRECTORY       = docs_doxygen
+CREATE_SUBDIRS         = NO
+OUTPUT_LANGUAGE        = English
+OPTIMIZE_OUTPUT_FOR_C  = YES
+OPTIMIZE_OUTPUT_JAVA   = NO
+MARKDOWN_SUPPORT       = YES
+AUTOLINK_SUPPORT       = YES
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+EXTRACT_LOCAL_CLASSES  = NO
+RECURSIVE              = YES
+EXTRACT_ANON_NSPACES   = NO
+CASE_SENSE_NAMES       = YES
+HIDE_SCOPE_NAMES       = NO
+HIDE_IN_BODY_DOCS      = NO
+GENERATE_TODOLIST      = YES
+GENERATE_TESTLIST      = NO
+GENERATE_BUGLIST       = NO
+GENERATE_DEPRECATEDLIST= NO
+ENABLED_SECTIONS       =
+MAX_INITIALIZER_LINES  = 30
+SHOW_NAMESPACES        = NO
+FILE_VERSION_FILTER    =
+SHOW_INCLUDE_FILES     = YES
+SHOW_GROUPED_MEMB_INC  = NO
+FORCE_LOCAL_INCLUDES   = NO
+INLINE_INHERITED_MEMB  = NO
+INLINE_SIMPLE_STRUCTS  = NO
+SORT_MEMBER_DOCS       = YES
+SORT_BRIEF_DOCS        = YES
+SORT_MEMBERS_CTORS_1ST = NO
+SORT_GROUP_NAMES      = NO
+GENERATE_HTML          = YES
+GENERATE_HTMLHELP      = NO
+GENERATE_DOCSET        = NO
+GENERATE_ECLIPSEHELP   = NO
+GENERATE_QHP           = NO
+GENERATE_TREEVIEW      = NO
+DISABLE_INDEX          = NO
+FULL_SIDEBAR           = NO
+HTML_OUTPUT            = html
+HTML_FILE_EXTENSION    = .html
+HTML_COLORSTYLE        = auto
+HTML_TIMESTAMP         = YES
+HTML_DYNAMIC_SECTIONS  = NO
+HTML_INDEX_NUM_ENTRIES = 100
+GENERATE_LATEX         = NO
+GENERATE_RTF           = NO
+GENERATE_MAN           = NO
+GENERATE_DOCBOOK       = NO
+GENERATE_XML           = YES
+XML_OUTPUT             = xml
+XML_PROGRAMLISTING     = YES
+# ----- Input -----
+INPUT                  = Core/Src Core/Inc Src Drivers/ssd1306 docs_src
+FILE_PATTERNS          = *.c *.h *.md
+RECURSIVE              = YES
+EXCLUDE                = ThirdParty/ \
+                         build/ \
+                         */stm32*_hal_*.c
+EXCLUDE_PATTERNS       = */ThirdParty/* \
+                         */.git/*
+# Strip paths for shorter names in docs
+STRIP_FROM_PATH        = .
+STRIP_FROM_INC_PATH    = .
+# ----- Brief vs Detailed: use @brief for short, @details for long -----
+REPEAT_BRIEF           = YES
+JAVADOC_AUTOBRIEF      = NO
+MULTILINE_CPP_IS_BRIEF = NO
+QT_AUTOBRIEF           = NO
+# ----- Predefined (STM32) -----
+PREDEFINED             = __GNUC__=1 \
+                         USE_HAL_DRIVER \
+                         USE_LWIP=1 \
+                         USE_CRYPTO_SIGN=1
+ENABLE_PREPROCESSING   = YES
+MACRO_EXPANSION        = NO
+EXPAND_AS_DEFINED      =
+SKIP_FUNCTION_MACROS   = YES

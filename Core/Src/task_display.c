@@ -1,11 +1,21 @@
 /**
   ******************************************************************************
   * @file    task_display.c
-  * @brief   Display module - SSD1306 state machine, queue-based UI.
+  * @brief   SSD1306 128×32 — four scroll lines, state machine, queue-driven UI.
   ******************************************************************************
-  * @details Queue: Net puts Transaction_Data_t in g_display_queue.
-  *          Display wakes, sees new data, switches to UI_STATE_WALLET, shows recipient.
-  *          Display "freezes" on WALLET when is_pending until User confirms (task_io).
+  * @details
+  *          **Inputs:** @c g_display_queue (@c Transaction_Data_t from net),
+  *          @c g_display_ctx + @c g_display_ctx_mutex (signing/net status),
+  *          @c Task_Display_Log() — **UART + on-screen log** (architecture: logging hub).
+  *
+  *          **UI states:** @c UI_State_t / @c display_state_t — WALLET, SECURITY,
+  *          NETWORK, LOG (amount, lock/sig, IP/MAC, scroll buffer).
+  *
+  *          **Concurrency:** @c g_i2c_mutex wraps I2C; @c g_ui_mutex for merged UI data.
+  *          **Clean-code note:** @c display_task / @c render_four_scroll_lines are long;
+  *          acceptable for embedded; could be split further.
+  *
+  *          **Docs:** @c docs_src/architecture.md , @c README.md .
   ******************************************************************************
   */
 

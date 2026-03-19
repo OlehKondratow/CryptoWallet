@@ -1,12 +1,14 @@
 /**
   ******************************************************************************
   * @file    main.h
-  * @brief   Secure Crypto Wallet - NUCLEO-H743ZI2 pin definitions and shared types.
+  * @brief   Board pins, LEDs, UART logging macro, network IP defaults.
   ******************************************************************************
-  * @details Hardware: STM32H743ZI2 (Nucleo-144).
-  *          OLED: SSD1306 I2C 0x3C, 128x32, PB8/PB9.
-  *          LEDs: PB0 (Green), PE1 (Yellow), PE2 (Red).
-  *          User Key (Confirm): PC13.
+  * @details
+  *          STM32H743ZI2 (Nucleo-144). **Documentation index:** repository @c README.md .
+  *          **Pinout table:** @c Core/Src/hw_init.c and @c docs_src/pinout.md .
+  *
+  *          Adjust @c IP_ADDR0..3 , netmask, gateway for your LAN; DHCP vs static in
+  *          @c Core/Inc/lwipopts.h .
   ******************************************************************************
   */
 

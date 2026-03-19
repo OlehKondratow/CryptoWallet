@@ -1,11 +1,13 @@
 /**
   ******************************************************************************
   * @file    task_net.h
-  * @brief   Connectivity module - LwIP stack, HTTP server for transaction data.
+  * @brief   LwIP + HTTP — Ethernet stack and port 80 API for transactions.
   ******************************************************************************
-  * @details LwIP Ethernet integration. HTTP server thread receives POST /tx
-  *          with JSON body, decodes and sends to task_security via g_tx_queue.
-  *          When USE_LWIP is undefined, Task_Net_Create is a no-op.
+  * @details
+  *          Parses @c POST /tx (JSON or form), validates, enqueues @c wallet_tx_t to
+  *          @c g_tx_queue for @c task_sign.c . Pushes display updates via
+  *          @c g_display_queue . May call @c Task_Display_Log() (direct log — common
+  *          in embedded). Without @c USE_LWIP , @c Task_Net_Create() is empty.
   ******************************************************************************
   */
 

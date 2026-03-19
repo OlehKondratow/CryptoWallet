@@ -1,5 +1,25 @@
 # Secure Crypto Wallet - FreeRTOS firmware for NUCLEO-H743ZI2
 # Dependencies: STM32CubeH7, stm32-ssd1306, stm32_secure_boot (linker, FreeRTOS)
+#
+# Documentation index: README.md (repo root). Module-level detail: file headers in
+# Core/Src/*.c, Core/Inc/*.h, Src/task_net.c.
+#
+# ----- Common make variables (override: make VAR=1) -----
+# USE_LWIP          - LwIP + Ethernet + HTTP task (default 1)
+# USE_CRYPTO_SIGN   - trezor-crypto + signing stack (default 0)
+# USE_TEST_SEED     - known test mnemonic in wallet_seed.c; forces USE_CRYPTO_SIGN
+# USE_WEBUSB        - USB device WebUSB on PA11/PA12
+# SKIP_OLED         - skip OLED/I2C paths when display bus hangs
+# LWIP_ALIVE_LOG    - periodic UART alive from display/net tasks
+#
+# ----- Notable targets -----
+# all, flash         - main firmware
+# minimal-lwip       - staged LwIP bring-up build
+# flash-minimal-lwip - flash minimal image
+# boottest / flash-boottest - no FreeRTOS diagnostic
+# secure-signing-test - Python smoke (see scripts/bootloader_secure_signing_test.py)
+# docs / docs-serve  - MkDocs (regenerates testing-plan-signing-rng.md)
+#
 # USE_LWIP=1 enables LwIP Ethernet + HTTP server (default: enabled)
 
 USE_LWIP ?= 1
@@ -116,15 +136,41 @@ OBJ += $(BUILD)/ethernetif.o $(BUILD)/app_ethernet_cw.o $(BUILD)/cmsis_os2.o $(B
        $(BUILD)/lwip_ip4_frag.o $(BUILD)/lwip_ethernet.o $(BUILD)/lwip_slip.o $(BUILD)/lwip_sntp.o
 endif
 
-.PHONY: all clean flash docs docs-serve minimal-lwip flash-minimal-lwip boottest flash-boottest
+.PHONY: all clean flash docs docs-md docs-code-md docs-doxygen docs-serve minimal-lwip flash-minimal-lwip boottest flash-boottest secure-signing-test
 .DEFAULT_GOAL := all
 
 # Generate docs (MkDocs Material). Uses .venv-docs if present, else system mkdocs
 MKDOCS = $(if $(wildcard .venv-docs/bin/mkdocs),.venv-docs/bin/mkdocs,mkdocs)
+PYTHON3 ?= python3
 docs:
-	@$(MKDOCS) --version >/dev/null 2>&1 || { echo "Install: python3 -m venv .venv-docs && .venv-docs/bin/pip install mkdocs mkdocs-material pymdown-extensions"; exit 1; }
+	@$(MKDOCS) --version >/dev/null 2>&1 || { echo "Install: python3 -m venv .venv-docs && .venv-docs/bin/pip install -r requirements-docs.txt"; exit 1; }
+	@echo "Regenerating docs_src/testing-plan-signing-rng.md ..."
+	@$(PYTHON3) scripts/test_plan_signing_rng.py --write docs_src/testing-plan-signing-rng.md
+	@echo "Regenerating docs_src/reference-code.md from source headers ..."
+	@$(PYTHON3) scripts/generate_code_reference_md.py -o docs_src/reference-code.md
 	$(MKDOCS) build
 	@echo "Docs: docs/index.html"
+
+# Markdown only: regenerate generated .md (no MkDocs / no docs/ HTML)
+docs-md:
+	@echo "Regenerating docs_src/testing-plan-signing-rng.md ..."
+	@$(PYTHON3) scripts/test_plan_signing_rng.py --write docs_src/testing-plan-signing-rng.md
+	@$(MAKE) docs-code-md
+	@echo "OK: generated docs_src/*.md; run 'make docs' for HTML site."
+
+# Code headers → docs_src/reference-code.md (see docs_src/code-doc-generation.md)
+docs-code-md:
+	@echo "Regenerating docs_src/reference-code.md ..."
+	@$(PYTHON3) scripts/generate_code_reference_md.py -o docs_src/reference-code.md
+
+# Doxygen: XML + HTML; then update README "Project Structure" and optionally emit .md per file
+docs-doxygen:
+	@command -v doxygen >/dev/null 2>&1 || { echo "Install doxygen (e.g. apt install doxygen)"; exit 1; }
+	doxygen Doxyfile
+	@$(PYTHON3) scripts/update_readme.py
+	@$(PYTHON3) scripts/update_readme.py --md-dir docs_doxygen/md
+	@$(PYTHON3) scripts/update_docs_src_index.py
+	@echo "Doxygen: docs_doxygen/html, docs_doxygen/xml; README sections updated (Project Structure + docs_src index); docs_doxygen/md/*.md"
 
 # Serve docs locally (live reload)
 docs-serve:
@@ -213,6 +259,10 @@ flash-minimal-lwip: minimal-lwip
 
 flash-boottest: boottest
 	st-flash --connect-under-reset write $(BUILD)/$(BINNAME).bin 0x08000000
+
+# Boot + flash + HTTP signing smoke test (see scripts/README.md)
+secure-signing-test:
+	python3 $(TOP)/scripts/bootloader_secure_signing_test.py
 
 all: minimal-lwip
 

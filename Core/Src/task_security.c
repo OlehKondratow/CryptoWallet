@@ -1,10 +1,16 @@
 /**
   ******************************************************************************
   * @file    task_security.c
-  * @brief   Security task - FSM for transaction signing (Trezor-style).
+  * @brief   Alternate signing FSM with **mock** SHA256/ECDSA (placeholders).
   ******************************************************************************
-  * @details FSM: IDLE -> RECEIVED -> WAIT_CONFIRM -> IN_PROGRESS -> DONE.
-  *          Uses memzero for sensitive data. User confirmation timeout 30s.
+  * @details
+  *          **Status:** Object file is linked, but @c Task_Security_Create() is **not**
+  *          invoked from @c main.c . Production firmware uses @c task_sign.c with
+  *          real crypto when @c USE_CRYPTO_SIGN . Keep this module for bring-up or
+  *          comparison with Trezor-style FSM (IDLE→RECEIVED→WAIT_CONFIRM→…).
+  *
+  *          Uses @c memzero() for sensitive buffers; confirm timeout 30 s.
+  *          **Docs:** @c docs_src/architecture.md (task table + data-flow).
   ******************************************************************************
   */
 

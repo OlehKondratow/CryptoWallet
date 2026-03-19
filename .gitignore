@@ -33,6 +33,7 @@ build/
 
 # Python / MkDocs
 .venv-docs/
+.venv-scripts/
 .venv/
 __pycache__/
 *.py[cod]
@@ -40,6 +41,7 @@ __pycache__/
 *.egg-info/
 .eggs/
 docs/
+docs_doxygen/
 
 # IDE / editor
 .idea/

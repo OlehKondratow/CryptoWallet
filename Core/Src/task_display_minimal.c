@@ -1,10 +1,12 @@
 /**
   ******************************************************************************
   * @file    task_display_minimal.c
-  * @brief   Minimal display task for minimal+LwIP staged build.
+  * @brief   Reduced display task for `minimal-lwip` — faster Ethernet-first bring-up.
   ******************************************************************************
-  * @details Simple LED+OLED loop, Task_Display_Log stub. Replaces full
-  *          task_display.c when building minimal-lwip.
+  * @details
+  *          **Purpose:** Same logging hook as full UI but minimal OLED/state machine load
+  *          while validating LwIP. Swapped in by Makefile instead of @c task_display.c .
+  *          @c SKIP_OLED=1 skips I2C if bus hangs. **Production UI:** @c task_display.c .
   ******************************************************************************
   */
 
@@ -32,8 +34,9 @@ static void display_task(void *pvParameters);
 #define LOG_LINE_CHARS  21U  /**< SSD1306 128px / 6px per char */
 
 /**
- * @brief Append log message to UART and update display line 4.
- * @param msg Null-terminated string.
+ * @brief   Mirror log to UART (CRLF) and copy printable tail into @c g_display_ctx.log_line .
+ * @details Takes @c g_display_ctx_mutex when available. Safe to call from multiple tasks; short timeout.
+ * @param   msg  Null-terminated ASCII message.
  */
 void Task_Display_Log(const char *msg)
 {
@@ -57,7 +60,8 @@ void Task_Display_Log(const char *msg)
 }
 
 /**
- * @brief Create and start the minimal display task.
+ * @brief   Spawn @c display_task (stack @c DISP_STACK , priority @c DISP_PRIO ).
+ * @details Used in @c minimal-lwip build instead of full @c task_display.c implementation.
  */
 void Task_Display_Create(void)
 {
@@ -65,9 +69,8 @@ void Task_Display_Create(void)
 }
 
 /**
- * @brief Stub - no-op for minimal build.
- * @param new_data Unused.
- * @return pdTRUE.
+ * @brief   No-op in minimal build (queue UI path unused).
+ * @return  Always @c pdTRUE .
  */
 BaseType_t UI_UpdateData(const UI_Display_Data_t *new_data)
 {
@@ -83,8 +86,9 @@ void UI_ClearPending(void)
 }
 
 /**
- * @brief Display task - LED blink, OLED init, IP display.
- * @param pvParameters Unused.
+ * @brief   Minimal OLED refresh loop: banner, optional IP string, log line.
+ * @details When @c SKIP_OLED , skips I2C traffic. Lower priority than net task so Ethernet comes up first.
+ * @param   pvParameters  Unused.
  */
 static void display_task(void *pvParameters)
 {

@@ -1,9 +1,12 @@
 /**
   ******************************************************************************
   * @file    ssd1306_conf.h
-  * @brief   SSD1306 config for CryptoWallet - I2C1, 128x32.
+  * @brief   Display driver tuning — I2C1, 128×32, 0x3C, Font 6×8.
   ******************************************************************************
-  * @details Set SSD1306_USE_ADDR_3D to 1 if your module uses 0x3D (SA0 high).
+  * @details
+  *          Binds Cube @c hi2c1 to the **ssd1306** sources from sibling repo
+  *          @c stm32-ssd1306 . Consumed by @c task_display.c / @c task_display_minimal.c .
+  *          Set @c SSD1306_USE_ADDR_3D to 1 if the module uses 0x3D (SA0 high).
   ******************************************************************************
   */
 

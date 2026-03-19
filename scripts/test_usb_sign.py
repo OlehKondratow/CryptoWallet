@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """
-Тестовый скрипт для проверки подписи транзакции по WebUSB.
+Test script for transaction signing over WebUSB.
 
-Требования:
-  pip install pyusb
+Documentation index: README.md (repo root). Protocol notes: Core/Src/usb_webusb.c , docs_src/webusb.md .
+
+Requirements:
+  pip install -r scripts/requirements.txt   # pyusb (+ pyserial for other scripts)
   Linux: libusb-1.0 (apt install libusb-1.0-0-dev), udev rules
          udev/99-cryptowallet-webusb.rules → /etc/udev/rules.d/
 
-Использование:
-  python scripts/test_usb_sign.py ping          # проверка связи (ping → pong)
-  python scripts/test_usb_sign.py sign          # запрос подписи (подтвердить USER на устройстве)
-  python scripts/test_usb_sign.py sign --recipient 1A1zP1... --amount 0.001 --currency BTC
+Usage:
+  python3 scripts/test_usb_sign.py ping          # connectivity (ping → pong)
+  python3 scripts/test_usb_sign.py sign          # signing request (confirm USER on device)
+  python3 scripts/test_usb_sign.py sign --recipient 1A1zP1... --amount 0.001 --currency BTC
 """
 
 import argparse
@@ -21,7 +23,7 @@ try:
     import usb.core
     import usb.util
 except ImportError:
-    print("Установите pyusb: pip install pyusb")
+    print("Install pyusb: pip install -r scripts/requirements.txt")
     sys.exit(1)
 
 # CryptoWallet WebUSB (usbd_desc_cw.c)
@@ -43,7 +45,9 @@ SIGN_MAX_WAIT_S = 30
 def find_device():
     dev = usb.core.find(idVendor=VID, idProduct=PID)
     if dev is None:
-        raise RuntimeError(f"Устройство {VID:04x}:{PID:04x} не найдено. Подключите CryptoWallet по USB.")
+        raise RuntimeError(
+            f"Device {VID:04x}:{PID:04x} not found. Connect CryptoWallet via USB."
+        )
     return dev
 
 
@@ -74,18 +78,18 @@ def read(dev, size: int = 64) -> bytes:
 
 
 def cmd_ping(dev) -> bool:
-    """Ping: отправить 'ping', получить 'pong'."""
+    """Ping: send 'ping', expect 'pong'."""
     write(dev, b"ping")
     resp = read(dev, 4)
     ok = resp == b"pong"
-    print("pong" if ok else f"Ожидалось 'pong', получено: {resp!r}")
+    print("pong" if ok else f"Expected 'pong', got: {resp!r}")
     return ok
 
 
 def cmd_sign(dev, recipient: str, amount: str, currency: str) -> bytes | None:
     """
-    Запрос подписи. Отправить JSON, ждать подтверждения на устройстве,
-    получить 65 байт (0x02 + 64 байта подписи).
+    Signing request: send JSON, wait for confirmation on device,
+    receive 65 bytes (0x02 + 64-byte signature).
     """
     tx = {
         "recipient": recipient,
@@ -94,30 +98,34 @@ def cmd_sign(dev, recipient: str, amount: str, currency: str) -> bytes | None:
     }
     payload = json.dumps(tx).encode("utf-8")
     write(dev, payload)
-    print("TX отправлен. Подтвердите на устройстве (короткое нажатие USER)...")
+    print("TX sent. Confirm on device (short USER press)...")
 
     try:
         resp = dev.read(EP_IN, 65, timeout=SIGN_MAX_WAIT_S * 1000)
     except usb.core.USBError as e:
         if "timed out" in str(e).lower() or "timeout" in str(e).lower():
-            print("Таймаут: подпись не получена. Подтвердите на устройстве.")
+            print("Timeout: no signature. Confirm on the device.")
         else:
-            print(f"USB ошибка при чтении: {e}")
+            print(f"USB read error: {e}")
         return None
 
     resp = bytes(resp)
     if len(resp) >= 65 and resp[0] == CMD_SIGN_RESP:
         return resp[1:65]
-    print(f"Неожиданный ответ: {resp[:16].hex()}... (len={len(resp)})")
+    print(f"Unexpected response: {resp[:16].hex()}... (len={len(resp)})")
     return None
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Тест подписи CryptoWallet по USB")
+    parser = argparse.ArgumentParser(description="CryptoWallet USB signing test")
     parser.add_argument("cmd", choices=["ping", "sign"], help="ping | sign")
-    parser.add_argument("--recipient", default="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa", help="Адрес получателя")
-    parser.add_argument("--amount", default="0.001", help="Сумма")
-    parser.add_argument("--currency", default="BTC", help="Валюта")
+    parser.add_argument(
+        "--recipient",
+        default="1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa",
+        help="Recipient address",
+    )
+    parser.add_argument("--amount", default="0.001", help="Amount")
+    parser.add_argument("--currency", default="BTC", help="Currency")
     args = parser.parse_args()
 
     dev = None
@@ -134,14 +142,14 @@ def main():
             sig = cmd_sign(dev, args.recipient, args.amount, args.currency)
             if sig is not None:
                 hex_sig = sig.hex().upper()
-                print(f"Подпись ({len(sig)} байт):\n{hex_sig}")
+                print(f"Signature ({len(sig)} bytes):\n{hex_sig}")
                 sys.exit(0)
             sys.exit(1)
 
     except usb.core.USBError as e:
-        print(f"USB ошибка: {e}")
+        print(f"USB error: {e}")
         if "Access denied" in str(e) or "Permission" in str(e):
-            print("Подсказка: добавьте udev rules или запустите с sudo")
+            print("Hint: add udev rules or run with sudo")
         sys.exit(1)
     except RuntimeError as e:
         print(e)

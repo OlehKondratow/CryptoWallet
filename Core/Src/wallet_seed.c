@@ -1,10 +1,13 @@
 /**
   ******************************************************************************
   * @file    wallet_seed.c
-  * @brief   get_wallet_seed implementation — test mnemonic for dev only.
+  * @brief   Strong get_wallet_seed() when USE_TEST_SEED=1 (development only).
   ******************************************************************************
-  * @details USE_TEST_SEED=1: uses BIP-39 test vector "abandon ... about".
-  *          NEVER use for real funds. For production, implement secure storage.
+  * @details
+  *          BIP-39 vector "abandon ... about" → 64-byte seed. **Never for real funds.**
+  *          Production: replace with secure element / flash encryption workflow.
+  *          **Audit:** scripts/bootloader_secure_signing_test.py --elf-audit-only .
+  *          **Build:** Makefile USE_TEST_SEED=1 (implies USE_CRYPTO_SIGN).
   ******************************************************************************
   */
 

@@ -1,12 +1,21 @@
 /**
   ******************************************************************************
   * @file    task_net.c
-  * @brief   Connectivity module - LwIP stack, HTTP server for transaction data.
+  * @brief   LwIP + HTTP — DHCP/static IP, POST /tx, signing poll endpoints.
   ******************************************************************************
-  * @details LwIP Ethernet integration. HTTP server on port 80. POST /tx with
-  *          JSON: {"recipient":"addr","amount":"0.1","currency":"BTC"}.
-  *          Decodes Recipient, Amount, Currency and sends to task_security
-  *          via g_tx_queue. When USE_LWIP undefined, no task created.
+  * @details
+  *          **Functional role:** Edge of the wallet facing the LAN — TCP/IP, HTTP
+  *          server, JSON/form parsing **without** an external JSON library (size).
+  *
+  *          **HTTP:** Port 80. Body JSON or form: recipient, amount, currency.
+  *          Validated via @c tx_request_validate.c , then @c wallet_tx_t to
+  *          @c g_tx_queue → @c task_sign.c (not @c task_security.c ).
+  *          Ping / signed-result endpoints — @c docs_src/api.md .
+  *
+  *          **IP:** DHCP with static fallback (e.g. 192.168.0.10) in @c main.h .
+  *          **Build:** @c USE_LWIP ; BSP from Cube / @c stm32_secure_boot template paths.
+  *
+  *          **Tests:** @c docs_src/testing-signing.md , @c scripts/bootloader_secure_signing_test.py .
   ******************************************************************************
   */
 

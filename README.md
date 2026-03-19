@@ -1,106 +1,67 @@
-# Secure Crypto Wallet
+# CryptoWallet
 
-Modular FreeRTOS-based firmware for a Secure Crypto Wallet on **STM32H743ZI2 (Nucleo-144)**.
+## Project Structure
 
-## Architecture
+| Module | Brief |
+|--------|-------|
+| `Core/Inc/app_ethernet.h` | Ethernet link callback and DHCP thread interface. |
+| `Core/Inc/crypto_wallet.h` | trezor-crypto integration: RNG, BIP-39, BIP-32, ECDSA secp256k1. |
+| `Core/Inc/hw_init.h` | Hardware initialization wrapper (CMSIS-compliant). |
+| `Core/Inc/lwipopts.h` | (no description) |
+| `Core/Inc/main.h` | Board pins, LEDs, UART logging macro, network IP defaults. |
+| `Core/Inc/memzero.h` | Secure memory zeroing (prevents compiler optimization). |
+| `Core/Inc/sha256_minimal.h` | (no description) |
+| `Core/Inc/task_display.h` | OLED task API — SSD1306 UI types and Task_Display_Log . |
+| `Core/Inc/task_io.h` | IO module - LEDs only. |
+| `Core/Inc/task_net.h` | LwIP + HTTP — Ethernet stack and port 80 API for transactions. |
+| `Core/Inc/task_security.h` | Header for legacy task_security.c (mock crypto FSM). |
+| `Core/Inc/task_sign.h` | Production signing task — g_tx_queue consumer, USER confirm, ECDSA. |
+| `Core/Inc/task_user.h` | User button task — USER key (PC13) handling. |
+| `Core/Inc/time_service.h` | SNTP API — init, start after link, epoch + formatted UTC. |
+| `Core/Inc/tx_request_validate.h` | Request analysis and validation for crypto transaction signing. |
+| `Core/Inc/usb_device.h` | USB device init for CryptoWallet WebUSB. |
+| `Core/Inc/usb_webusb.h` | WebUSB vendor-specific class for CryptoWallet. |
+| `Core/Inc/usbd_conf.h` | USB device conf - redirects to CryptoWallet WebUSB config. |
+| `Core/Inc/usbd_conf_cw.h` | USB device BSP configuration for CryptoWallet WebUSB. |
+| `Core/Inc/usbd_desc_cw.h` | USB device descriptors for CryptoWallet WebUSB. |
+| `Core/Inc/wallet_shared.h` | Shared types and IPC: queues, events, mutexes, display context. |
+| `Core/Src/crypto_wallet.c` | trezor-crypto glue: STM32 TRNG, random_buffer , BIP-32, ECDSA sign. |
+| `Core/Src/hw_init.c` | Board bring-up: clock, MPU/cache, GPIO, I2C1 (OLED), UART, optional USB. |
+| `Core/Src/main.c` | FreeRTOS entry: IPC objects, task creation, OS hooks. |
+| `Core/Src/memzero.c` | Secure memzero() — volatile byte writes (no optimize-out). |
+| `Core/Src/sha256_minimal.c` | SHA-256 only — used when USE_CRYPTO_SIGN=0 (no trezor-crypto). |
+| `Core/Src/stm32h7xx_hal_msp.c` | MSP init for CryptoWallet - I2C1 (SSD1306). |
+| `Core/Src/stm32h7xx_it.c` | Interrupt handlers - FreeRTOS SysTick, ETH (when USE_LWIP). |
+| `Core/Src/stm32h7xx_it_systick.c` | SysTick handler for minimal-lwip (FreeRTOS tick). |
+| `Core/Src/stm32h7xx_it_usb.c` | USB OTG HS interrupt handler (WebUSB). |
+| `Core/Src/task_display.c` | SSD1306 128×32 — four scroll lines, state machine, queue-driven UI. |
+| `Core/Src/task_display_minimal.c` | Reduced display task for minimal-lwip — faster Ethernet-first bring-up. |
+| `Core/Src/task_io.c` | LED policy task — system / network / alert indicators only. |
+| `Core/Src/task_security.c` | Alternate signing FSM with mock SHA256/ECDSA (placeholders). |
+| `Core/Src/task_sign.c` | Primary signing task — consumes g_tx_queue , USER confirm, ECDSA. |
+| `Core/Src/task_user.c` | Physical UX — USER (PC13) debounce, confirm vs reject for signing. |
+| `Core/Src/time_service.c` | SNTP client — wall-clock epoch and UTC strings for logs/UI. |
+| `Core/Src/tx_request_validate.c` | Validate host-supplied recipient / amount / currency before signing. |
+| `Core/Src/usb_device.c` | USB device initialization for CryptoWallet WebUSB. |
+| `Core/Src/usb_webusb.c` | WebUSB vendor class — ping/pong and binary sign request/response. |
+| `Core/Src/usbd_conf_cw.c` | USB device BSP for CryptoWallet WebUSB (NUCLEO-H743ZI2, PA11/PA12). |
+| `Core/Src/usbd_desc_cw.c` | USB device descriptors for CryptoWallet WebUSB. |
+| `Core/Src/wallet_seed.c` | Strong get_wallet_seed() when USE_TEST_SEED=1 (development only). |
+| `Drivers/ssd1306/ssd1306_conf.h` | Display driver tuning — I2C1, 128×32, 0x3C, Font 6×8. |
+| `Src/app_ethernet_cw.c` | Ethernet glue — link callbacks, DHCP state machine, LED feedback. |
+| `Src/task_net.c` | LwIP + HTTP — DHCP/static IP, POST /tx, signing poll endpoints. |
 
-- **Core**: `main.c` — Hardware init and FreeRTOS scheduler start only.
-- **Display** (`task_display`): SSD1306 (I2C1, PB8/PB9, 128×32, 0x3C) state machine.
-- **Security** (`task_security`): Transaction decode, User Key confirm, mock SHA256/signing.
-- **Network** (`task_net`): LwIP + HTTP server (optional, `USE_LWIP`).
-- **IO** (`task_io`): LEDs (Green/Yellow/Red), User Button (PC13) with debouncing.
-
-## Dependencies
-
-- **STM32CubeH7** (sibling `../STM32CubeH7`)
-- **stm32-ssd1306** (sibling `../stm32-ssd1306`)
-- **stm32_secure_boot** (sibling `../stm32_secure_boot`) — linker script, FreeRTOS
-- **trezor-crypto** (optional, `ThirdParty/trezor-crypto`) — MIT License, для ECDSA подписи при `USE_CRYPTO_SIGN=1`
-
-## Build
-
-```bash
-make
-```
-
-## Documentation
-
-MkDocs + Material theme. Source: `docs_src/*.md`
-
-```bash
-# One-time: create venv and install
-python3 -m venv .venv-docs
-.venv-docs/bin/pip install -r requirements-docs.txt
-
-make docs          # → docs/index.html
-make docs-serve    # live reload at http://127.0.0.1:8000
-```
-
-## Flash
-
-```bash
-make flash
-```
-
-## Build options
-
-**DHCP timeout**: If DHCP fails, static fallback 192.168.0.10 is used. Adjust `IP_ADDR0..3`, `NETMASK_*`, `GW_*` in `Core/Inc/main.h` to match your network. For static-only: set `LWIP_DHCP 0` in `Core/Inc/lwipopts.h`.
-
-**Verbose log**: `make LWIP_ALIVE_LOG=1` enables UART heartbeat ("Disp: alive", "Net: alive").
-
-**Skip OLED**: `make SKIP_OLED=1` if I2C hangs.
-
-**WebUSB**: `make USE_WEBUSB=1` enables USB device on PA11/PA12 (CN13) for Chrome WebUSB API. Linux: copy `udev/99-cryptowallet-webusb.rules` to `/etc/udev/rules.d/` and reload udev.
-
-**Boot test** (diagnostic: no FreeRTOS, LED blink only):
-```bash
-make boottest
-make flash-boottest
-```
-Expected: UART "CryptoWallet + LwIP" and "boot" every 500ms, LED1 blink.
-
-**GDB/st-util** (debug + flash): Run from project root:
-```bash
-# Terminal 1: st-util
-st-util
-
-# Terminal 2: build + GDB (load flashes the device)
-make
-arm-none-eabi-gdb -x gdb_minimal_lwip.gdb
-
-# Or manually:
-arm-none-eabi-gdb build/cryptowallet.elf
-(gdb) target extended-remote :4242
-(gdb) monitor reset halt
-(gdb) load
-(gdb) c
-# When UART shows "Net: start" and hangs: Ctrl+C in GDB
-(gdb) bt          # backtrace — where it's stuck
-(gdb) info threads
-```
-
-## Display States
-
-| State      | Content                                      |
-|-----------|-----------------------------------------------|
-| WALLET    | Currency type and amount                      |
-| SECURITY  | Safe status (Locked/Unlocked), signature      |
-| NETWORK   | IP/MAC, HID connection                        |
-| LOG       | Scrollable system log                         |
-
-## Inter-Task Communication
-
-- **Queue**: `task_net` → `task_security` (transaction data)
-- **Event Group**: `task_io` → `task_security` (User Confirmed)
-- **Mutex**: I2C access for display
-
-## Pinout (Nucleo-H743ZI2)
-
-| Function   | Pin  |
-|-----------|------|
-| LED1 (Green)  | PB0  |
-| LED2 (Yellow) | PE1  |
-| LED3 (Red)    | PE2  |
-| User Key      | PC13 |
-| I2C1 SCL      | PB8  |
-| I2C1 SDA      | PB9  |
+## Учебные разборы (docs_src)
+<!-- DOXYGEN_DOCS_SRC_INDEX -->
+| Модуль | Краткий обзор |
+|--------|------------------|
+| [api-documentation-scope](docs_src/api-documentation-scope.md) | Страница фиксирует прогресс по Doxygen-покрытию и показывает, какие модули уже получили “развёрнутый” комментарий (через `@brief/@details`). Следующий шаг — превратить оставшиеся места в такие же учебные разборы без перегруза исходников. |
+| [doxygen-comments](docs_src/doxygen-comments.md) | У Doxygen нет нативной опции `GENERATE_MARKDOWN`, поэтому этот проект использует **XML output** и скрипты для генерации Markdown и обновления README. Чтобы корректно разделять **короткое** (`@brief`) и **длинное** (`@details`) описание, в коде применяется единый шаблон комментариев. |
+| [hw_init](docs_src/hw_init.md) | Модуль `hw_init` отвечает за низкоуровневый “bring-up” платы: настройку системных тактов, (в зависимости от сборки) MPU/кэш для LwIP, GPIO для индикации/UX, инициализацию I2C1 (OLED/SSD1306) и USART3 (UART-лог), а также опциональные USB и RNG. Важная часть логики спрятана в правильном порядке вызовов между `main.c`, `HW_Init_Early_LwIP()` и `HW_Init()`. |
+| [main](docs_src/main.md) | <brief>Модуль `main` описывает “склейку” всего приложения на STM32H7: он задаёт порядок ранних HAL/LwIP инициализаций, создаёт IPC-объекты (очереди/семафоры/event group), запускает критические задачи FreeRTOS и поднимает планировщик.</brief> |
+| [task_display](docs_src/task_display.md) | <brief>Модуль `task_display` управляет визуальным состоянием кошелька на SSD1306: он принимает события сети/подписания, объединяет их в единое отображаемое состояние и рендерит 4 строки UI с “бегущей строкой” для логов и сетевых данных.</brief> |
+| [task_display_minimal](docs_src/task_display_minimal.md) | <brief>Модуль `task_display_minimal` — облегчённая реализация UI/лога для `minimal-lwip`: он минимизирует нагрузку на SSD1306, зеркалит сообщения в UART и пишет короткий хвост в `g_display_ctx`, чтобы дисплей можно было обновлять только по необходимости.</brief> |
+| [task_io](docs_src/task_io.md) | <brief>Модуль `task_io` отвечает за визуальные индикаторы безопасности и статуса системы: он периодически обновляет LED1 как “alive”, управляет LED2 как сетевым индикатором (в зависимости от сборки LwIP) и включает LED3 при наличии security alert.</brief> |
+| [task_user](docs_src/task_user.md) | <brief>Модуль `task_user` реализует физическую UX-логику для кнопки USER (PC13): делает debounce, различает короткое нажатие (Confirm) и длинное удержание (~2.5s) как Reject и сигналит это в `task_sign` через `g_user_event_group`.</brief> |
+| [time_service](docs_src/time_service.md) | <brief>Модуль `time_service` обеспечивает синхронизацию времени по SNTP и даёт приложению унифицированный доступ к текущему Unix epoch и строковому представлению UTC (для логов/UI), построенному поверх `HAL_GetTick()` после получения epoch из сети.</brief> |
+<!-- /DOXYGEN_DOCS_SRC_INDEX -->

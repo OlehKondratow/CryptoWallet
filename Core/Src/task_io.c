@@ -1,10 +1,15 @@
 /**
   ******************************************************************************
   * @file    task_io.c
-  * @brief   IO module - LEDs only.
+  * @brief   LED policy task — system / network / alert indicators only.
   ******************************************************************************
-  * @details LED1 (Green) System OK, LED2 (Yellow) Network, LED3 (Red) Security.
-  *          USER button handling moved to task_user.c.
+  * @details
+  *          **Scope:** LED1 green (alive), LED2 yellow (network hint), LED3 red
+  *          (@c g_security_alert ). **Does not** read USER button — that is
+  *          @c task_user.c → @c g_user_event_group → @c task_sign.c .
+  *
+  *          Matches “one module, one responsibility” from architecture review.
+  *          **Pins:** @c main.h .
   ******************************************************************************
   */
 
@@ -20,10 +25,14 @@
 #define IO_PRIORITY          (tskIDLE_PRIORITY + 1)
 #define POLL_MS              100U
 
+/** @brief LED update loop; reflects @c g_security_alert on LED3. */
 static void io_task(void *pvParameters);
 
+/** @brief Drive LED1 (green) active level per board polarity in @c main.h . */
 static void led1_set(bool on);
+/** @brief Drive LED2 (yellow). */
 static void led2_set(bool on);
+/** @brief Drive LED3 (red) — security alert. */
 static void led3_set(bool on);
 
 void Task_IO_Create(void)

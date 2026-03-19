@@ -1,7 +1,17 @@
 /**
   ******************************************************************************
   * @file    usb_webusb.c
-  * @brief   WebUSB vendor-specific class implementation.
+  * @brief   WebUSB vendor class — ping/pong and binary sign request/response.
+  ******************************************************************************
+  * @details
+  *          **Descriptors / IDs:** @c Core/Src/usbd_desc_cw.c (e.g. VID/PID for host).
+  *          **Framing:** command byte + payload; responses include status + 64-byte
+  *          ECDSA compact sig when applicable.
+  *
+  *          **Host tools:** @c scripts/test_usb_sign.py (pyusb). **Docs:** @c docs_src/webusb.md ,
+  *          @c udev/99-cryptowallet-webusb.rules on Linux.
+  *
+  *          Guarded by @c USE_WEBUSB .
   ******************************************************************************
   */
 

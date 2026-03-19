@@ -1,10 +1,13 @@
 /**
   ******************************************************************************
   * @file    time_service.c
-  * @brief   SNTP time service implementation.
+  * @brief   SNTP client — wall-clock epoch and UTC strings for logs/UI.
   ******************************************************************************
-  * @details Ported from lwip_zero. Uses Task_Display_Log (UART + OLED). Leap year and epoch-to-UTC
-  *          conversion for formatted output.
+  * @details
+  *          **Support module** in architecture: not on the signing hot path; provides
+  *          time after Ethernet is up (@c time_service_start() ). Ported from lwip_zero,
+  *          uses @c pool.ntp.org , logs via @c Task_Display_Log() (UART + OLED line).
+  *          Leap-year and epoch→UTC formatting for human-readable timestamps.
   ******************************************************************************
   */
 #include "time_service.h"

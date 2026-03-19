@@ -1,10 +1,31 @@
 /**
   ******************************************************************************
   * @file    main.c
-  * @brief   CryptoWallet — FreeRTOS + LwIP + display (STM32H743ZI2).
+  * @brief   FreeRTOS entry: IPC objects, task creation, OS hooks.
   ******************************************************************************
-  * @details MPU + Cache before HAL_Init (lwip_zero order). Display + Net tasks.
-  *          BOOT_TEST: diagnostic without FreeRTOS. SKIP_OLED: skip I2C/OLED.
+  * @details
+  *          **Product (high-level):** Embedded wallet on STM32H743 (Nucleo-144): receive
+  *          sign requests over Ethernet (HTTP) and/or WebUSB, confirm on USER button,
+  *          show status on SSD1306; optional full ECDSA via trezor-crypto (@c USE_CRYPTO_SIGN ).
+  *
+  *          **Tasks started here:** @c Task_Display_Create , @c Task_Net_Create ,
+  *          @c Task_Sign_Create , @c Task_IO_Create , @c Task_User_Create .
+  *          @c task_security.c is linked, but @c Task_Security_Create() is **not** called
+  *          from this file — production signing runs in @c task_sign.c .
+  *
+  *          **IPC (globals by design):** @c g_tx_queue (net → sign), @c g_display_queue ,
+  *          @c g_user_event_group (user button → sign), I2C/UI/display mutexes — see
+  *          @c wallet_shared.h .
+  *
+  *          **Boot order:** with @c USE_LWIP , @c HW_Init_Early_LwIP() before @c HAL_Init()
+  *          (MPU/cache, lwip_zero order). Then @c HW_Init() , @c time_service_init() ,
+  *          @c crypto_rng_init() when crypto enabled.
+  *
+  *          **Build flags:** @c BOOT_TEST — no FreeRTOS; @c SKIP_OLED — skip OLED path.
+  *          **Hooks:** @c vApplicationMallocFailedHook , @c vApplicationStackOverflowHook ,
+  *          @c Error_Handler .
+  *
+  *          See @c docs_src/architecture.md , repository @c README.md .
   ******************************************************************************
   */
 

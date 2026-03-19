@@ -3,8 +3,6 @@
   * @file    hw_init.h
   * @brief   Hardware initialization wrapper (CMSIS-compliant).
   ******************************************************************************
-  * @details No hardware registers in main.c; all init via this wrapper.
-  ******************************************************************************
   */
 
 #ifndef __HW_INIT_H
@@ -16,24 +14,26 @@
 extern "C" {
 #endif
 
-/** @brief I2C1 handle for SSD1306 (defined in hw_init.c) */
+/** @brief HAL I2C1 instance bound to SSD1306 (PB8/PB9); defined in @c hw_init.c . */
 extern I2C_HandleTypeDef hi2c1;
 
-/** @brief USART3 handle for debug log (PD8/PD9, 115200) */
+/** @brief USART3 for debug logging (115200, pins in @c main.h / MSP). */
 extern UART_HandleTypeDef huart3;
 
-/** @brief Send string to UART (no newline). */
+/**
+ * @brief   Blocking UART print of a C string (no CRLF appended).
+ */
 void UART_Log(const char *msg);
 
 #ifdef USE_LWIP
-/** @brief MPU + Cache init for LwIP — call BEFORE HAL_Init() (same order as lwip_zero). */
+/**
+ * @brief   Configure MPU regions and caches before @c HAL_Init() for Ethernet/DMA safety.
+ */
 void HW_Init_Early_LwIP(void);
 #endif
 
 /**
- * @brief Initialize all hardware (clock, MPU, cache, GPIO, I2C1).
- * @note  Called from main() before FreeRTOS scheduler start.
- * @return None.
+ * @brief   Full board setup after @c HAL_Init() : clocks, GPIO, I2C1, UART3, optional USB.
  */
 void HW_Init(void);
 

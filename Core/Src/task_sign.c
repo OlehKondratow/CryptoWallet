@@ -1,12 +1,22 @@
 /**
   ******************************************************************************
   * @file    task_sign.c
-  * @brief   Signing task — request analysis, validation, ECDSA secp256k1.
+  * @brief   Primary signing task — consumes @c g_tx_queue , USER confirm, ECDSA.
   ******************************************************************************
-  * @details Original implementation. Validates incoming tx via tx_request_validate,
-  *          hashes with SHA-256, waits for user confirm (g_user_event_group),
-  *          derives key m/44'/0'/0'/0/0, signs with crypto_sign_btc_hash.
-  *          No code copied from trezor-firmware.
+  * @details
+  *          **Architecture position:** Main consumer of @c g_tx_queue (from @c task_net
+  *          and potentially WebUSB path). Producer of @c g_last_sig and display updates.
+  *          This is the **active** signing path in @c main.c (@c Task_Sign_Create ).
+  *
+  *          **Pipeline:** Dequeue @c wallet_tx_t → @c tx_request_validate → build
+  *          deterministic string → SHA-256 → wait @c EVENT_USER_CONFIRMED or reject.
+  *          Derive @c m/44'/0'/0'/0/0 , @c crypto_sign_btc_hash() → @c g_last_sig .
+  *
+  *          **Seed:** @c get_wallet_seed() (weak stub or @c wallet_seed.c with @c USE_TEST_SEED ).
+  *          **Crypto:** @c crypto_wallet.c / trezor-crypto when @c USE_CRYPTO_SIGN .
+  *
+  *          Original wallet logic; no code copied from trezor-firmware.
+  *          **Docs:** @c docs_src/verification-signing.md , @c docs_src/crypto-messages.md .
   ******************************************************************************
   */
 
@@ -52,7 +62,12 @@ __attribute__((weak)) int get_wallet_seed(uint8_t *seed_out, size_t max_len)
 }
 
 /**
- * @brief Build data to hash: recipient|amount|currency (deterministic).
+ * @brief   Format canonical string @c "recipient|amount|currency" for SHA-256.
+ * @details Currency defaults to @c "BTC" when @c tx->currency is empty. Buffer must fit NUL-terminated result.
+ * @param   tx       Validated transaction.
+ * @param   buf      Output buffer.
+ * @param   buf_size Capacity including NUL.
+ * @return  Written length excluding NUL on success; @c 0 on overflow or invalid args.
  */
 static size_t build_hash_input(const wallet_tx_t *tx, char *buf, size_t buf_size)
 {
@@ -64,6 +79,13 @@ static size_t build_hash_input(const wallet_tx_t *tx, char *buf, size_t buf_size
     return (size_t)n;
 }
 
+/**
+ * @brief   Main signing loop: dequeue @c wallet_tx_t , validate, hash, wait USER, derive, ECDSA sign.
+ * @details States: @c SIGNING_IDLE → RECEIVED → WAIT_CONFIRM → (sign) → IDLE. Updates @c g_display_ctx ,
+ *          @c g_last_sig , @c g_security_alert , calls @c WebUSB_NotifySignatureReady() when applicable.
+ *          Sensitive buffers zeroed on all exit paths.
+ * @param   pvParameters  Unused (NULL).
+ */
 static void sign_task(void *pvParameters)
 {
     (void)pvParameters;

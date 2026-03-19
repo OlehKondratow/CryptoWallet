@@ -1,10 +1,7 @@
 /**
   ******************************************************************************
   * @file    hw_init.c
-  * @brief   Hardware initialization - clock, MPU, GPIO, I2C1 (SSD1306).
-  ******************************************************************************
-  * @details Uses HAL drivers. I2C1 on PB8/PB9. LEDs on PB0, PE1, PE2.
-  *          User Key on PC13.
+  * @brief   Board bring-up: clock, MPU/cache, GPIO, I2C1 (OLED), UART, optional USB.
   ******************************************************************************
   */
 
@@ -27,8 +24,7 @@ static void MPU_Config(void);
 
 #ifdef USE_LWIP
 /**
- * @brief MPU + Cache init for LwIP (same order as lwip_zero).
- * @note  Call BEFORE HAL_Init() from main.c.
+ * @brief MPU + Cache init for LwIP before `HAL_Init()`.
  */
 void HW_Init_Early_LwIP(void)
 {
@@ -96,8 +92,7 @@ static void MX_RNG_Init(void);
 #endif
 
 /**
- * @brief Initialize all hardware subsystems.
- * @return None.
+ * @brief Initialize board peripherals after `HAL_Init()`.
  */
 void HW_Init(void)
 {
@@ -119,7 +114,9 @@ void HW_Init(void)
 #endif
     MX_USART3_Init();
 #if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
+    Task_Display_Log("USB init");
     MX_USB_Device_Init();
+    Task_Display_Log("USB ready");
 #endif
 #if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
     MX_RNG_Init();

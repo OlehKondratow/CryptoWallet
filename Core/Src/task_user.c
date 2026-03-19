@@ -1,10 +1,15 @@
 /**
   ******************************************************************************
   * @file    task_user.c
-  * @brief   User button task — USER key (PC13) with debouncing.
+  * @brief   Physical UX — USER (PC13) debounce, confirm vs reject for signing.
   ******************************************************************************
-  * @details Polls USER_KEY (PC13). Short press = EVENT_USER_CONFIRMED,
-  *          long press (2.5s) = EVENT_USER_REJECTED. Debounce 50ms.
+  * @details
+  *          **Architecture:** Sole owner of the USER GPIO for wallet policy; isolates
+  *          button timing from @c task_io.c (LEDs only). Short press →
+  *          @c EVENT_USER_CONFIRMED ; ~2.5 s hold → @c EVENT_USER_REJECTED .
+  *          Debounce 50 ms; @c task_sign.c waits on @c g_user_event_group .
+  *
+  *          **Docs:** @c docs_src/testing-signing.md , @c docs_src/architecture.md .
   ******************************************************************************
   */
 
@@ -23,6 +28,7 @@
 #define LONG_PRESS_MS        2500U
 #define POLL_MS              20U
 
+/** @brief Poll USER GPIO, debounce, set @c g_user_event_group bits. */
 static void user_task(void *pvParameters);
 
 void Task_User_Create(void)

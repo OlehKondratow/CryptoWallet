@@ -1,11 +1,14 @@
 /**
   ******************************************************************************
   * @file    app_ethernet_cw.c
-  * @brief   Ethernet adapter — link status, DHCP, LED control.
+  * @brief   Ethernet glue — link callbacks, DHCP state machine, LED feedback.
   ******************************************************************************
-  * @details Ported from lwip_zero. ethernet_link_status_updated() called by
-  *          LwIP on link change. DHCP_Thread for DHCP client. LED2=network,
-  *          LED3=link down. Uses Task_Display_Log (UART + OLED line 3).
+  * @details
+  *          **Support module:** Bridges LwIP/netif to board LEDs and user feedback.
+  *          @c ethernet_link_status_updated() on link change; DHCP thread when
+  *          @c LWIP_DHCP . LED2 = network activity hint, LED3 = link-down warning.
+  *          Logs through @c Task_Display_Log() . Starts @c time_service_start() when
+  *          appropriate. Ported from lwip_zero.
   ******************************************************************************
   */
 #include "main.h"

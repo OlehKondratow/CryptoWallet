@@ -1,10 +1,12 @@
 /**
   ******************************************************************************
   * @file    time_service.h
-  * @brief   SNTP time service — epoch and UTC string.
+  * @brief   SNTP API — init, start after link, epoch + formatted UTC.
   ******************************************************************************
-  * @details Ported from lwip_zero. Uses pool.ntp.org. Call init before LwIP,
-  *          start after link up. Provides epoch seconds and formatted UTC string.
+  * @details
+  *          Call @c time_service_init() before @c tcpip_init ; @c time_service_start()
+  *          after Ethernet link up. Feeds wallet logs / UI time strings; see
+  *          @c time_service.c and @c docs_src/architecture.md (support modules).
   ******************************************************************************
   */
 

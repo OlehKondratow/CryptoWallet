@@ -16,10 +16,9 @@ extern "C" {
 #endif
 
 /**
- * @brief Create and start the USER button task.
- * @note  Call from main() before vTaskStartScheduler().
- *        Requires: g_user_event_group.
- * @return None.
+ * @brief   Create FreeRTOS task that polls USER button (PC13) with debounce.
+ * @details Priority @c tskIDLE_PRIORITY+2 , stack 192 words. Sets @c EVENT_USER_CONFIRMED or
+ *          @c EVENT_USER_REJECTED on @c g_user_event_group . Call before @c vTaskStartScheduler() .
  */
 void Task_User_Create(void);
 

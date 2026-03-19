@@ -1,12 +1,17 @@
 /**
   ******************************************************************************
   * @file    crypto_wallet.c
-  * @brief   trezor-crypto integration: RNG, BIP-39, BIP-32, ECDSA secp256k1.
+  * @brief   trezor-crypto glue: STM32 TRNG, @c random_buffer , BIP-32, ECDSA sign.
   ******************************************************************************
-  * @details trezor-crypto files to include in build:
-  *          crypto/bip39.c, crypto/bip32.c, crypto/ecdsa.c, crypto/secp256k1.c,
-  *          crypto/sha2.c, crypto/hmac.c, crypto/pbkdf2.c, crypto/bignum.c,
-  *          crypto/rand.c (or override random_buffer only)
+  * @details
+  *          **RNG:** @c random_buffer() mixes HAL RNG + entropy pool; used by trezor-crypto.
+  *          **When @c USE_CRYPTO_SIGN=0 :** hashing helpers fall back to @c sha256_minimal.c .
+  *
+  *          **Makefile** links selected @c ThirdParty/trezor-crypto objects (see @c Makefile ).
+  *          **Entropy / testing:** @c docs_src/rng-entropy.md , @c scripts/capture_rng_uart.py ,
+  *          @c scripts/run_dieharder.py .
+  *
+  *          **Integration overview:** @c docs_src/trezor-crypto-integration.md .
   ******************************************************************************
   */
 
@@ -64,6 +69,11 @@ void random_permute(char *str, size_t len)
     }
 }
 
+/**
+ * @brief   Fill @a buf with mixed TRNG and LCG-style pool (trezor @c random_buffer hook).
+ * @details When @c hrng.Instance is valid, XORs HAL RNG words with @c s_rng_entropy_pool ;
+ *          otherwise falls back to software pool only. Used by all trezor-crypto RNG calls.
+ */
 void random_buffer(uint8_t *buf, size_t len)
 {
     if (buf == NULL || len == 0U) return;
@@ -83,6 +93,9 @@ void random_buffer(uint8_t *buf, size_t len)
     }
 }
 
+/**
+ * @copydoc crypto_rng_init
+ */
 int crypto_rng_init(void)
 {
     if (hrng.Instance == NULL) return -1;
@@ -98,6 +111,7 @@ int crypto_rng_init(void)
     return 0;
 }
 #else
+/** @copydoc crypto_rng_init */
 int crypto_rng_init(void)
 {
     return 0;
@@ -112,6 +126,7 @@ int crypto_rng_init(void)
  * mnemonic_from_data(data, len) — len=16 gives 12 words
  */
 
+/** @copydoc crypto_entropy_to_mnemonic_12 */
 int crypto_entropy_to_mnemonic_12(const uint8_t entropy[CRYPTO_ENTROPY_128_BITS],
                                   char *mnemonic_out, size_t mnemonic_size)
 {
@@ -135,6 +150,7 @@ int crypto_entropy_to_mnemonic_12(const uint8_t entropy[CRYPTO_ENTROPY_128_BITS]
  * hdnode_private_ckd_prime = hdnode_private_ckd(node, i | 0x80000000)
  */
 
+/** @copydoc crypto_derive_btc_m44_0_0_0_0 */
 int crypto_derive_btc_m44_0_0_0_0(const uint8_t *seed, size_t seed_len,
                                   uint8_t priv_key_out[32])
 {
@@ -177,6 +193,7 @@ static int is_canonical(uint8_t by, uint8_t sig[64])
     return 1;  /* Accept all for compact format */
 }
 
+/** @copydoc crypto_sign_btc_hash */
 int crypto_sign_btc_hash(uint8_t priv_key[32],
                          const uint8_t hash[CRYPTO_SHA256_DIGEST_LEN],
                          uint8_t sig_out[CRYPTO_ECDSA_SIG_LEN])
@@ -194,6 +211,7 @@ int crypto_sign_btc_hash(uint8_t priv_key[32],
 
 #else
 /* Stubs when USE_CRYPTO_SIGN=0 */
+/** @copydoc crypto_entropy_to_mnemonic_12 */
 int crypto_entropy_to_mnemonic_12(const uint8_t entropy[CRYPTO_ENTROPY_128_BITS],
                                   char *mnemonic_out, size_t mnemonic_size)
 {
@@ -203,6 +221,7 @@ int crypto_entropy_to_mnemonic_12(const uint8_t entropy[CRYPTO_ENTROPY_128_BITS]
     return -1;
 }
 
+/** @copydoc crypto_derive_btc_m44_0_0_0_0 */
 int crypto_derive_btc_m44_0_0_0_0(const uint8_t *seed, size_t seed_len,
                                   uint8_t priv_key_out[32])
 {
@@ -212,6 +231,7 @@ int crypto_derive_btc_m44_0_0_0_0(const uint8_t *seed, size_t seed_len,
     return -1;
 }
 
+/** @copydoc crypto_sign_btc_hash */
 int crypto_sign_btc_hash(uint8_t priv_key[32],
                          const uint8_t hash[CRYPTO_SHA256_DIGEST_LEN],
                          uint8_t sig_out[CRYPTO_ECDSA_SIG_LEN])
@@ -226,6 +246,7 @@ int crypto_sign_btc_hash(uint8_t priv_key[32],
 /*-----------------------------------------------------------------------------
  * SHA-256: one-shot hash (always compiled)
  *-----------------------------------------------------------------------------*/
+/** @copydoc crypto_hash_sha256 */
 int crypto_hash_sha256(const uint8_t *data, size_t len,
                        uint8_t digest_out[CRYPTO_SHA256_DIGEST_LEN])
 {

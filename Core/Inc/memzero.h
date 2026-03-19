@@ -18,9 +18,11 @@ extern "C" {
 #include <stddef.h>
 
 /**
- * @brief Securely zero memory. Compiler cannot optimize away.
- * @param pnt  Pointer to buffer.
- * @param len  Length in bytes.
+ * @brief   Overwrite a buffer with zeros using volatile writes.
+ * @details Prevents the compiler from removing the loop (unlike @c memset in some LTO builds).
+ *          Use after handling seeds, private keys, digests, or temporary signature buffers.
+ * @param   pnt  Start address; may be any alignment (byte-wise write).
+ * @param   len  Number of bytes to clear; zero is a no-op.
  */
 void memzero(void *pnt, size_t len);
 

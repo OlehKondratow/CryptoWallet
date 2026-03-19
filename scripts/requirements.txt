@@ -1,1 +1,14 @@
-pyusb>=1.2.0
+# Python dependencies for scripts/ (WebUSB, UART RNG capture).
+#
+# Install (flexible versions):
+#   python3 -m venv .venv-scripts
+#   .venv-scripts/bin/pip install -U pip
+#   .venv-scripts/bin/pip install -r scripts/requirements.txt
+#
+# Or pin exact versions (full resolved set — same as requirements.lock.txt here):
+#   .venv-scripts/bin/pip install -r scripts/requirements.lock.txt
+#
+# System (not via pip): libusb-1.0 + udev rules for WebUSB; `dieharder` for RNG stats.
+
+pyusb>=1.2.0,<2
+pyserial>=3.5,<4
