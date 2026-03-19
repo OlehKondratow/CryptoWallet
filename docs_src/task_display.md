@@ -6,71 +6,76 @@
 
 # `task_display.c` + `task_display.h`
 
-<brief>Модуль `task_display` управляет визуальным состоянием кошелька на SSD1306: он принимает события сети/подписания, объединяет их в единое отображаемое состояние и рендерит 4 строки UI с “бегущей строкой” для логов и сетевых данных.</brief>
+<brief>The `task_display` module manages the visual state of the wallet on SSD1306: it receives network/signing events, merges them into a single displayable state, and renders 4 lines of UI with "scrolling text" for logs and network data.</brief>
 
-## Краткий обзор
-<brief>Модуль `task_display` управляет визуальным состоянием кошелька на SSD1306: он принимает события сети/подписания, объединяет их в единое отображаемое состояние и рендерит 4 строки UI с “бегущей строкой” для логов и сетевых данных.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-`task_display` — это “витрина” состояния системы и транспорт для диагностического лога. Его бизнес-роль — показать пользователю и разработчику: (1) активен ли pending-транзакцией режим подтверждения, (2) безопасен ли кошелёк (locked/unlocked), (3) что происходит в сети (IP/MAC, USB-подсказки), и (4) хвост последних сообщений. Архитектурно он не вычисляет подпись и не парсит HTTP: он работает как consumer “сигналов”, которые приходят через очереди и общие структуры UI.
+The `task_display` module manages the visual state of the wallet on SSD1306: it receives network/signing events, merges them into a single displayable state, and renders 4 lines of UI with "scrolling text" for logs and network data.
 
-## Logic Flow (UI rendering + queue/event merge)
-Основной поток — бесконечный цикл задачи display:
-1. Инициализация внутренних буферов.
-2. Ожидание: с ограничением по времени задача пытается извлечь “snapshot” pending-транзакции из очереди.
-3. Обновление внутреннего UI-контекста (pending flag + данные транзакции) с защитой mutex.
-4. Рендер текущих 4 строк на SSD1306.
-5. Периодическая задержка для “тикрейта” обновления/скролла.
+## Logic Flow (UI Rendering + Queue/Event Merge)
 
-### UI состояния (как оно “живёт”)
-Прямой state machine уровня enum нет как “классической” автоматики, но есть условное разложение на 4 строки:
-| Строка | Что отображает | Движение/скролл |
-|---|---|---|
-| 0 | WALLET: coin, amount, укороченный recipient + индикатор режима `Confirm?` | статично (без scroll) |
-| 1 | SECURITY: Safe locked/unlocked + подсказка/статус подписи | статично |
-| 2 | NETWORK: IP + MAC | скролл (если строка длиннее) |
-| 3 | LOG: хвост последних сообщений | скролл |
+Main task loop:
+1. Initialize internal buffers
+2. Wait: task attempts to extract pending transaction "snapshot" from queue with time limit
+3. Update internal UI context (pending flag + transaction data) with mutex protection
+4. Render current 4 lines on SSD1306
+5. Periodic delay for "tick rate" of update/scroll
 
-Сдвиг скролла реализован через `s_line_offset[row]`:
-- строки 0–1: offset принудительно сбрасывается в 0;
-- строки 2–3: offset инкрементируется по модулю длины строки.
+### UI States (How It "Lives")
 
-## Прерывания/регистры
-Модуль — задача FreeRTOS, прямой работы с регистрами нет. Единственная “регистро-подобная” часть — обращение к UI драйверу SSD1306, который уже скрывает низкоуровневую работу через I2C.
+No explicit enum state machine like "classic" automation, but conditional layout on 4 lines:
 
-Критичные блокировки:
-| Ресурс | Как защищают | Где |
-|---|---|---|
-| I2C | берут `g_i2c_mutex` (в render_lock/unlock) | при заполнении/выводе на SSD1306 |
-| Общие UI-данные | `g_ui_mutex` | при merge pending/контекстов |
-| display context | `g_display_ctx_mutex` | при обновлении хвоста лога |
+| Line | What It Displays | Movement/Scroll |
+|------|-----------------|-----------------|
+| 0 | WALLET: coin, amount, shortened recipient + mode indicator `Confirm?` | static (no scroll) |
+| 1 | SECURITY: Safe locked/unlocked + signature status/hint | static |
+| 2 | NETWORK: IP + MAC | scroll (if line longer) |
+| 3 | LOG: tail of recent messages | scroll |
 
-## Тайминги и ветвления
-| Параметр | Значение | Смысл |
-|---|---:|---|
-| Очередь display | timeout `QUEUE_WAIT_MS=100ms` | обновления pending не блокируют рендер надолго |
-| Лог-скролл | `LOG_SCROLL_MS=120ms` | скорость “тикрейта” отображения |
-| Блокировка I2C | `portMAX_DELAY` | гарантирует атомарный вывод на OLED |
-| Mutex UI | wait `pdMS_TO_TICKS(50)` / рендер `pdMS_TO_TICKS(20)` | предотвращает зависания, но ограничивает максимальные задержки |
+Scroll offset implemented via `s_line_offset[row]`:
+- lines 0-1: offset forced to 0
+- lines 2-3: offset incremented modulo line length
 
-Ветвления:
-- если очередь pending не дала данных — UI остаётся в текущем состоянии и просто продолжает рендерить строки;
-- динамика `Confirm?` зависит от `pending_tx.is_pending`.
+## Interrupts and Registers
+
+Module is FreeRTOS task, no direct register work. Only "register-like" part: accessing SSD1306 UI driver, which hides low-level work via I2C.
+
+Critical locks:
+
+| Resource | How Protected | Where |
+|----------|---------------|-------|
+| I2C | take `g_i2c_mutex` (in render_lock/unlock) | filling/outputting to SSD1306 |
+| Common UI data | `g_ui_mutex` | merging pending/contexts |
+| display context | `g_display_ctx_mutex` | updating log tail |
+
+## Timings and Branches
+
+| Parameter | Value | Meaning |
+|-----------|-------|---------|
+| display queue | timeout `QUEUE_WAIT_MS=100ms` | pending updates don't block rendering long |
+| log scroll | `LOG_SCROLL_MS=120ms` | "tick rate" of display speed |
+| I2C lock | `portMAX_DELAY` | ensures atomic output to OLED |
+| UI mutex | wait `pdMS_TO_TICKS(50)` / render `pdMS_TO_TICKS(20)` | prevents hangs, limits max delays |
+
+Branches:
+- if pending queue didn't give data — UI stays in current state and just keeps rendering lines
+- `Confirm?` dynamics depend on `pending_tx.is_pending`
 
 ## Dependencies
-Прямые зависимости:
-- Глобальные каналы: `g_display_queue`, `g_ui_mutex`, `g_i2c_mutex`, `g_display_ctx_mutex`, внутренние структуры `s_ui_data`.
-- Общие типы UI: `Transaction_Data_t`, `UI_Display_Data_t` (из `task_display.h`).
-- Драйвер дисплея: `ssd1306_*` и `Font_6x8`.
 
-Косвенно влияет/координируется с:
-- сетью/HTTP: через размещение `pending_tx` в очереди (в `task_net.c` / логике запроса);
-- подписанием: когда после подтверждения/отклонения pending переводится из confirm-режима (через `UI_ClearPending()`).
+Direct dependencies:
+- Global channels: `g_display_queue`, `g_ui_mutex`, `g_i2c_mutex`, `g_display_ctx_mutex`, internal structures `s_ui_data`
+- Common UI types: `Transaction_Data_t`, `UI_Display_Data_t` (from `task_display.h`)
+- Display driver: `ssd1306_*` and `Font_6x8`
 
-## Связи
-- `task_display_minimal.md` (облегчённая версия для minimal-lwip)
-- `task_net.md` (генерация pending snapshot)
-- `task_sign.md` (clear pending и смена security/lock UX)
-- `task_user.md` (подтверждение/отклонение через event group)
+Indirectly affects/coordinates with:
+- network/HTTP: via placing `pending_tx` in queue (in `task_net.c` / request logic)
+- signing: when after confirmation/rejection pending transitions from confirm-mode (via `UI_ClearPending()`)
+
+## Module Relationships
+
+- `task_display_minimal.md` (lightweight version for minimal-lwip)
+- `task_net.md` (pending snapshot generation)
+- `task_sign.md` (clear pending and change security/lock UX)
+- `task_user.md` (confirmation/rejection via event group)
 - `hw_init.md` (I2C/SSD1306 base init)
-
