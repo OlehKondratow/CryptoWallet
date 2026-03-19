@@ -5,116 +5,112 @@
 
 # `hw_init.c` + `hw_init.h`
 
-<brief>Модуль `hw_init` отвечает за низкоуровневый bring-up платы: он формирует правильный порядок тактов/кэша/MPU (критично для LwIP/ETH), инициализирует GPIO для UX (LED/кнопка), поднимает I2C1 под SSD1306 и UART-лог, а также опционально поднимает USB и RNG.</brief>
+<brief>The `hw_init` module handles low-level board bring-up: it establishes proper clock/cache/MPU ordering (critical for LwIP/ETH), initializes GPIO for UX (LED/button), sets up I2C1 for SSD1306 and UART logging, plus optional USB and RNG.</brief>
 
-## Краткий обзор
-<brief>Модуль `hw_init` отвечает за низкоуровневый bring-up платы: он формирует правильный порядок тактов/кэша/MPU (критично для LwIP/ETH), инициализирует GPIO для UX (LED/кнопка), поднимает I2C1 под SSD1306 и UART-лог, а также опционально поднимает USB и RNG.</brief>
+## Overview
+<brief>The `hw_init` module handles low-level board bring-up: it establishes proper clock/cache/MPU ordering (critical for LwIP/ETH), initializes GPIO for UX (LED/button), sets up I2C1 for SSD1306 and UART logging, plus optional USB and RNG.</brief>
 
-## Abstract (Synthèse логики)
-`hw_init` — это “слой доверия” между HAL/Cube и приложением: он гарантирует, что до любой сетевой логики (если включена `USE_LWIP`) MPU и кэш настроены корректно для DMA и областей памяти, а затем что периферия, нужная задачам (I2C/OLED, UART и базовые GPIO), доступна в ожидаемом состоянии.
+## Abstract (Logic Synthesis)
+`hw_init` is a "trust layer" between HAL/Cube and the application: it ensures that before any network logic (when `USE_LWIP` is enabled), MPU and cache are correctly configured for DMA and memory regions; it then guarantees that peripherals needed by tasks (I2C/OLED, UART, and basic GPIO) are available in their expected state.
 
-## Logic Flow (bootstrap flow)
-С точки зрения порядка операций важны две точки входа:
-1. `HW_Init_Early_LwIP()` выполняется до `HAL_Init()` и включается только при `USE_LWIP`.
-2. `HW_Init()` выполняется после `HAL_Init()` и отвечает за основной bring-up: часы, GPIO, I2C1, UART3 и опциональные USB/RNG; инициализация OLED-части зависит от `SKIP_OLED`.
+## Logic Flow (bootstrap sequence)
+Two critical entry points exist:
+1. `HW_Init_Early_LwIP()` runs before `HAL_Init()` and is active only when `USE_LWIP` is set.
+2. `HW_Init()` runs after `HAL_Init()` and handles the main bring-up: clocks, GPIO, I2C1, UART3, and optional USB/RNG; OLED initialization depends on `SKIP_OLED`.
 
-## Детальный анализ
+## Detailed Analysis
 
-### Назначение и “границы” ответственности
-`hw_init` — это оболочка над HAL-инитами. По дизайну:
-- `main.c` готовит IPC/таски и стартует FreeRTOS, а также вызывает функции init в нужной последовательности.
-- `hw_init.c` держит “железный” порядок: часы, кэш/MPU, периферия (GPIO/I2C/UART) и зависимости по флагам сборки.
-- Сетевая логика (Ethernet PHY/DHCP/линк) не находится здесь напрямую: она “включается” окружением LwIP/Cube и реализована в других модулях (например, через Cube/BSP + `Src/app_ethernet_cw.c`).
+### Purpose and Responsibility Boundaries
+`hw_init` wraps HAL initialization. By design:
+- `main.c` prepares IPC/tasks and launches FreeRTOS, calling init functions in correct sequence.
+- `hw_init.c` maintains "hardware" order: clocks, cache/MPU, peripherals (GPIO/I2C/UART), and build-flag dependencies.
+- Network logic (Ethernet PHY/DHCP/link) doesn't live here directly: it's enabled by the LwIP/Cube environment and implemented in other modules (e.g., via Cube/BSP + `Src/app_ethernet_cw.c`).
 
-### Точка входа №1: `HW_Init_Early_LwIP()` (только при `USE_LWIP`)
-Эта функция вызывается из `main.c` **до** `HAL_Init()` и нужна для того, чтобы Cortex-M7 корректно работал с DMA/областями памяти, которые использует Ethernet/LwIP.
+### Entry Point #1: `HW_Init_Early_LwIP()` (only when `USE_LWIP`)
+This function is called from `main.c` **before** `HAL_Init()` to ensure Cortex-M7 correctly handles DMA/memory regions used by Ethernet/LwIP.
 
-Ключевая логика внутри:
-1. `HAL_MPU_Disable()` — чтобы безопасно перенастроить регионы.
-2. Формирование трёх MPU-регионов:
-   - **Region 0**: “закрыть всё” (4GB no-access) как дефолт.
-   - **Region 1**: область **`0x30000000`** (1 KB) под **ETH descriptors** (дескрипторы DMA).
-   - **Region 2**: область **`0x30004000`** (16 KB) под **LwIP heap**.
-3. `HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT)` — включение MPU.
-4. Включение кэшей: `SCB_EnableICache()` и `SCB_EnableDCache()`.
+Key logic inside:
+1. `HAL_MPU_Disable()` — safely reconfigure regions.
+2. Configure three MPU regions:
+   - **Region 0**: "deny all" (4GB no-access) as default.
+   - **Region 1**: address **`0x30000000`** (1 KB) for **ETH descriptors** (DMA descriptors).
+   - **Region 2**: address **`0x30004000`** (16 KB) for **LwIP heap**.
+3. `HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT)` — enable MPU.
+4. Enable caches: `SCB_EnableICache()` and `SCB_EnableDCache()`.
 
-Почему это важно для DMA:
-- Ethernet DMA читает/пишет в память, и если адреса дескрипторов/кучи не настроены так, кэш может “перехватить” данные и привести к рассинхронизации.
-- Конкретные базы/размеры подобраны под используемый LwIP/Cube-пайплайн (шаблон `lwip_zero`).
+Why this matters for DMA:
+- Ethernet DMA reads/writes memory; if descriptor/heap addresses aren't properly configured, cache can intercept data, causing desynchronization.
+- Specific base addresses/sizes are tuned to the LwIP/Cube pipeline (template `lwip_zero`).
 
-### Точка входа №2: `HW_Init()` (после `HAL_Init()`)
-`HW_Init()` — “основной” bring-up после `HAL_Init()`:
+### Entry Point #2: `HW_Init()` (after `HAL_Init()`)
+`HW_Init()` — main bring-up after `HAL_Init()`:
 
-1. **Сборка без LwIP (`!USE_LWIP`)**
-   - вызывается `MPU_Config()` (в текущей реализации — фактически `HAL_MPU_Disable()`; чтобы не держать MPU активным без надобности).
-   - `CPU_CACHE_Enable()` выполняется позже уже после смены тактов (как рекомендовано для H7).
+1. **Build without LwIP (`!USE_LWIP`)**
+   - Calls `MPU_Config()` (currently `HAL_MPU_Disable()`; avoids keeping MPU active unnecessarily).
+   - `CPU_CACHE_Enable()` runs later, after clock switching (recommended for H7).
 
-2. **Задержка после включения** (пустой цикл ~2M итераций)
-   - комментарий указывает на стабилизацию MCO/ST-Link clocking на Nucleo.
+2. **Post-enable delay** (empty loop ~2M iterations)
+   - Comment indicates MCO/ST-Link clocking stabilization on Nucleo.
 
 3. **`SystemClock_Config()`**
-   - включает питание (PWR regulator scale1),
-   - включает такт **D2 SRAM3**: `__HAL_RCC_D2SRAM3_CLK_ENABLE()`.
-   - настраивает PLL от HSE и задаёт делители AHB/APB. Это обеспечивает корректные частоты для HAL и периферии.
+   - Enables power (PWR regulator scale1).
+   - Enables **D2 SRAM3** clock: `__HAL_RCC_D2SRAM3_CLK_ENABLE()`.
+   - Configures PLL from HSE, sets AHB/APB dividers. Ensures correct frequencies for HAL and peripherals.
 
 4. `SystemCoreClockUpdate()`
-   - синхронизирует переменные HAL с фактическими частотами после переключения SYSCLK.
+   - Synchronizes HAL variables with actual clocking after SYSCLK switch.
 
-5. Инициализация периферии:
+5. Peripheral initialization:
    - `MX_GPIO_Init()`:
-     - включает такты портов LED1/LED2/LED3 и кнопки `USER`,
-     - настраивает светодиоды как `GPIO_MODE_OUTPUT_PP`, низкую скорость и выставляет “выкл” уровни,
-     - кнопку как `GPIO_MODE_INPUT`.
+     - Enables clocks for LED1/LED2/LED3 ports and `USER` button.
+     - Configures LEDs as `GPIO_MODE_OUTPUT_PP`, low speed, "off" levels.
+     - Configures button as `GPIO_MODE_INPUT`.
    - `MX_I2C1_Init()`:
-     - настраивает `hi2c1` (Timing ~ “как в соседнем проекте”, 7-bit addressing),
-     - включает аналоговый фильтр, отключает цифровой,
-     - затем `ssd1306_Init()` вызывается сразу после `MX_I2C1_Init()` только если `USE_LWIP && !SKIP_OLED`.
+     - Configures `hi2c1` (Timing matching reference, 7-bit addressing).
+     - Enables analog filter, disables digital.
+     - Calls `ssd1306_Init()` immediately after `MX_I2C1_Init()`, only when `USE_LWIP && !SKIP_OLED`.
    - `MX_USART3_Init()`:
-     - `USARTx` на 115200, 8N1, TX/RX режим,
-     - без hardware flow control, oversampling 16.
+     - `USARTx` at 115200, 8N1, TX/RX mode.
+     - No hardware flow control, oversampling 16.
 
-6. Опциональные ветки:
+6. Optional branches:
    - `USE_WEBUSB`:
-     - лог в UART через `Task_Display_Log()`,
-     - `MX_USB_Device_Init()`,
-     - второй лог “USB ready”.
+     - Log via UART through `Task_Display_Log()`.
+     - `MX_USB_Device_Init()`.
+     - Second log "USB ready".
    - `USE_CRYPTO_SIGN`:
-     - `MX_RNG_Init()` — инициализация аппаратного RNG через HAL (`hrng` + `HAL_RNG_Init()`),
-     - также предусмотрен `HAL_RNG_MspInit()` для включения такта `__HAL_RCC_RNG_CLK_ENABLE()`.
+     - `MX_RNG_Init()` — hardware RNG via HAL (`hrng` + `HAL_RNG_Init()`).
+     - Also provides `HAL_RNG_MspInit()` for clock enable `__HAL_RCC_RNG_CLK_ENABLE()`.
 
-### Взаимодействие с `main.c` и другими модулями
-В `Core/Src/main.c` порядок такой:
-1. `HW_Init_Early_LwIP()` (только при `USE_LWIP`)
+### Interaction with `main.c` and Other Modules
+In `Core/Src/main.c`, order is:
+1. `HW_Init_Early_LwIP()` (only when `USE_LWIP`)
 2. `HAL_Init()`
 3. `HW_Init()`
-Далее создаются очереди/семафоры и стартуют таски (`Task_Display_Create`, `Task_Net_Create`, `Task_Sign_Create`, `Task_IO_Create`, `Task_User_Create`).
+Then queues/semaphores are created and tasks launched (`Task_Display_Create`, `Task_Net_Create`, `Task_Sign_Create`, `Task_IO_Create`, `Task_User_Create`).
 
-Практический смысл порядка:
-- Ветка LwIP требует MPU/кэш до HAL, чтобы Ethernet DMA и LwIP heap работали корректно.
-- Ветка “OLED init” привязана к I2C: поэтому `ssd1306_Init()` выполняется сразу после `MX_I2C1_Init()`.
-- UART и USB/RNG (по флагам) подготавливаются в `HW_Init()`, чтобы ранние логи и крипто-база были доступны до основной логики задач.
+Practical rationale for this order:
+- LwIP branch requires MPU/cache before HAL so Ethernet DMA and LwIP heap work correctly.
+- "OLED init" branch is tied to I2C: `ssd1306_Init()` runs immediately after `MX_I2C1_Init()`.
+- UART and USB/RNG (per flags) are prepared in `HW_Init()` so early logging and crypto foundation are available before main task logic.
 
-### Уровень “регистров/параметров” без переписывания Cube
-`hw_init` не пытается заменить Cube: он делает точечные HAL-настройки:
-- часы/PLL и системные делители через `RCC_*` и `HAL_RCC_*`,
-- MPU через `HAL_MPU_ConfigRegion`,
-- периферия через HAL `HAL_GPIO_Init`, `HAL_I2C_Init`, `HAL_UART_Init`.
-Детали pinmux и MSP-инициализация для I2C/USART обычно “живут” в связке `stm32h7xx_hal_msp.c` (например, для I2C1 и USART3).
+### Register/Parameter Level without Rewriting Cube
+`hw_init` doesn't replace Cube; it makes targeted HAL adjustments:
+- Clock/PLL and system dividers via `RCC_*` and `HAL_RCC_*`.
+- MPU via `HAL_MPU_ConfigRegion`.
+- Peripherals via HAL `HAL_GPIO_Init`, `HAL_I2C_Init`, `HAL_UART_Init`.
+Pinmux details and MSP initialization for I2C/USART typically reside in `stm32h7xx_hal_msp.c` (e.g., I2C1 and USART3).
 
-## Связи
-- Использует: `main.c` (порядок вызовов), `hw_init.h` (API), HAL (`stm32h7xx_hal.h` и суб-модули), FreeRTOS только косвенно (через `Task_Display_Log`, но сама инициализация RTOS тут не делается).
-- I2C/OLED: `ssd1306.h`, `ssd1306_fonts.h`, дескриптор `hi2c1`.
-- UART лог: `UART_Log()` (вынесено в интерфейс `hw_init.h`), дескриптор `huart3`.
-- USB: `usb_device.h` и `MX_USB_Device_Init()` при `USE_WEBUSB`.
-- RNG/crypto: `RNG_HandleTypeDef` + `HAL_RNG_Init()` при `USE_CRYPTO_SIGN`.
-- Сборочные флаги: `USE_LWIP`, `SKIP_OLED`, `USE_WEBUSB`, `USE_CRYPTO_SIGN`.
+## Interrupts/Registers
+`hw_init` is the unique place where system controllers (MPU/cache/clock pipeline) are explicitly modified via HAL/CMSIS:
+- **MPU:** Regions (in LwIP branch) set access/attributes for ETH DMA descriptors and LwIP heap.
+- **Cache:** I/D-cache enabled after MPU setup.
+- **RCC/PWR:** PLL selection, D2 SRAM3 clock enable, divider configuration.
 
-## Что здесь “не описывается” подробно
-Эфир/PHY/DHCP/HTTP-обработка — это другие модули (Cube BSP + `Src/app_ethernet_cw.c` и `Src/task_net.c`), а также окружение LwIP.
-
-## Прерывания/регистры
-`hw_init` — единственное место, где явно модифицируются системные контроллеры (MPU/кэш/clock-пайплайн) через HAL/CMSIS:
-- MPU: регионы (в ветке LwIP) задают доступ/атрибуты для ETH DMA дескрипторов и heap LwIP.
-- Кэш: включение I/D-cache после настройки MPU.
-- RCC/PWR: выбор PLL, включение D2 SRAM3 clock и настройка делителей.
-
+## Relations
+- Uses: `main.c` (call sequence), `hw_init.h` (API), HAL (`stm32h7xx_hal.h` and sub-modules), FreeRTOS indirectly (via `Task_Display_Log`, but RTOS init itself doesn't happen here).
+- I2C/OLED: `ssd1306.h`, `ssd1306_fonts.h`, descriptor `hi2c1`.
+- UART logging: `UART_Log()` (exported in `hw_init.h` interface), descriptor `huart3`.
+- USB: `usb_device.h` and `MX_USB_Device_Init()` when `USE_WEBUSB`.
+- RNG/crypto: `RNG_HandleTypeDef` + `HAL_RNG_Init()` when `USE_CRYPTO_SIGN`.
+- Build flags: `USE_LWIP`, `SKIP_OLED`, `USE_WEBUSB`, `USE_CRYPTO_SIGN`.
