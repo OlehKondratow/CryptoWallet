@@ -2,58 +2,66 @@
 
 # `stm32h7xx_hal_msp.c`
 
-<brief>Файл `stm32h7xx_hal_msp` задаёт “железную” часть для HAL: `HAL_I2C_MspInit` конфигурирует I2C1 (PB8/PB9 под AF OD с подтяжкой), а `HAL_UART_MspInit` настраивает USART3 (TX/RX пины и клоки). Это гарантирует, что `hw_init` сможет инициализировать I2C/I2C-периферию и UART без ручного pin-парсинга в приложении.</brief>
+<brief>File `stm32h7xx_hal_msp` sets up hardware layer for HAL: `HAL_I2C_MspInit` configures I2C1 (PB8/PB9 as AF OD with pull-up), and `HAL_UART_MspInit` configures USART3 (TX/RX pins and clocks). This ensures `hw_init` can initialize I2C peripherals and UART without manual pin configuration in the application.</brief>
 
-## Краткий обзор
-<brief>Файл `stm32h7xx_hal_msp` задаёт “железную” часть для HAL: `HAL_I2C_MspInit` конфигурирует I2C1 (PB8/PB9 под AF OD с подтяжкой), а `HAL_UART_MspInit` настраивает USART3 (TX/RX пины и клоки). Это гарантирует, что `hw_init` сможет инициализировать I2C/I2C-периферию и UART без ручного pin-парсинга в приложении.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-HAL в STM32 разделяет две задачи:
-1) “что” инициализировать (параметры периферии) — делается в `hw_init` и HAL init вызовах,
-2) “как” именно подключить пины/клоки/IRQ — делается в MSP layer (`stm32h7xx_hal_msp.c`).
+<brief>File `stm32h7xx_hal_msp` sets up hardware layer for HAL: `HAL_I2C_MspInit` configures I2C1 (PB8/PB9 as AF OD with pull-up), and `HAL_UART_MspInit` configures USART3 (TX/RX pins and clocks). This ensures `hw_init` can initialize I2C peripherals and UART without manual pin configuration in the application.</brief>
 
-Этот файл реализует именно second layer, связывая макросы пинов из `main.h` с соответствующими HAL структурами.
+## Abstract (Logic Synthesis)
 
-## Logic Flow (MSP init)
+HAL in STM32 divides two tasks:
+1) "What" to initialize (peripheral parameters) — done in `hw_init` and HAL init calls
+2) "How" to connect pins/clocks/IRQs — done in MSP layer (`stm32h7xx_hal_msp.c`)
+
+This file implements the second layer, linking pin macros from `main.h` to corresponding HAL structures.
+
+## Logic Flow (MSP Init)
+
 ### I2C MSP
-`HAL_I2C_MspInit(hi2c)`:
-1. Если `hi2c->Instance == I2Cx`:
-   - включить клок GPIO порта,
-   - включить клок I2C,
-   - задать SCL/SDA:
-     - mode `GPIO_MODE_AF_OD`,
-     - pull-up `GPIO_PULLUP`,
-     - низкая скорость,
-     - alternate function `I2Cx_AF`.
 
-`HAL_I2C_MspDeInit` выполняет reset-подход: force reset/release reset и деинициализация пинов.
+`HAL_I2C_MspInit(hi2c)`:
+1. If `hi2c->Instance == I2Cx`:
+   - Enable GPIO port clock
+   - Enable I2C clock
+   - Configure SCL/SDA:
+     - Mode: `GPIO_MODE_AF_OD`
+     - Pull-up: `GPIO_PULLUP`
+     - Speed: Low
+     - Alternate function: `I2Cx_AF`
+
+`HAL_I2C_MspDeInit` uses force-reset approach: reset/release and pin deinitialization.
 
 ### UART MSP
+
 `HAL_UART_MspInit(huart)`:
-1. Если `huart->Instance == USARTx`:
-   - настроить peripheral clock selection для USART234578,
-   - включить клоки GPIO для TX/RX и USART,
-   - настроить TX/RX пины:
-     - alternate function `USARTx_TX_AF` и `USARTx_RX_AF`,
-     - mode AF_PP, pull-up, очень высокая скорость.
+1. If `huart->Instance == USARTx`:
+   - Configure peripheral clock selection for USART234578
+   - Enable clocks for TX/RX GPIO and USART
+   - Configure TX/RX pins:
+     - Alternate functions: `USARTx_TX_AF` and `USARTx_RX_AF`
+     - Mode: AF_PP, pull-up, very high speed
 
-`HAL_UART_MspDeInit` делает force reset/release reset и деинициализацию пинов.
+`HAL_UART_MspDeInit` performs force-reset/release and pin deinitialization.
 
-## Прерывания/регистры
-Файл не реализует ISR. Он работает через HAL GPIO/RCC интерфейсы (внутри HAL могут быть регистровые операции).
+## Interrupts/Registers
 
-## Тайминги
-Нет. Это статическая конфигурация перед запуском периферии.
+File does not implement ISR. It works through HAL GPIO/RCC interfaces (register operations are inside HAL).
+
+## Timings
+
+None. This is static configuration before peripheral startup.
 
 ## Dependencies
-Прямые:
-- Макросы из `main.h`: `I2Cx_*`, `USARTx_*`, clock enable macros
-- HAL типы: `I2C_HandleTypeDef`, `UART_HandleTypeDef`
 
-Куда влияет:
-- `hw_init.md` / `hw_init.c` вызывает `HAL_I2C_Init` и `HAL_UART_Init`, а MSP обеспечивает корректный pinmux/clock.
+Direct:
+- Macros from `main.h`: `I2Cx_*`, `USARTx_*`, clock enable macros
+- HAL types: `I2C_HandleTypeDef`, `UART_HandleTypeDef`
 
-## Связи
-- `hw_init.md` (кто вызывает HAL init)
-- `ssd1306_conf.md` (I2C target для SSD1306)
+Downstream impact:
+- `hw_init.md` / `hw_init.c` calls `HAL_I2C_Init` and `HAL_UART_Init`; MSP provides correct pinmux/clock
 
+## Relations
+
+- `hw_init.md` — Caller of HAL init functions
+- `ssd1306_conf.md` — I2C target for SSD1306 display

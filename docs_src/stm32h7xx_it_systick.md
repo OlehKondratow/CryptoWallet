@@ -2,34 +2,40 @@
 
 # `stm32h7xx_it_systick.c`
 
-<brief>Файл `stm32h7xx_it_systick` корректирует ситуацию для сборки minimal-lwip: он предоставляет `SysTick_Handler`, который синхронизирует HAL tick и tick FreeRTOS, чтобы избежать зависаний/некорректного поведения, когда базовый `stm32h7xx_it.c` не содержит `SysTick_Handler`.</brief>
+<brief>File `stm32h7xx_it_systick` addresses the situation for minimal-lwip builds: it provides `SysTick_Handler`, which synchronizes HAL tick and FreeRTOS tick to avoid hangs/incorrect behavior when the base `stm32h7xx_it.c` does not contain `SysTick_Handler`.</brief>
 
-## Краткий обзор
-<brief>Файл `stm32h7xx_it_systick` корректирует ситуацию для сборки minimal-lwip: он предоставляет `SysTick_Handler`, который синхронизирует HAL tick и tick FreeRTOS, чтобы избежать зависаний/некорректного поведения, когда базовый `stm32h7xx_it.c` не содержит `SysTick_Handler`.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-SysTick в STM32 — критичный interrupt: он питает одновременно HAL тайминг и FreeRTOS scheduling. В некоторых конфигурациях минимального LwIP (как указано в комментарии к файлу) базовый `stm32h7xx_it.c` может не подключить корректный обработчик, и это приводит к опасным последствиям (вплоть до infinite loop backtrace / WWDG).
+<brief>File `stm32h7xx_it_systick` addresses the situation for minimal-lwip builds: it provides `SysTick_Handler`, which synchronizes HAL tick and FreeRTOS tick to avoid hangs/incorrect behavior when the base `stm32h7xx_it.c` does not contain `SysTick_Handler`.</brief>
 
-`stm32h7xx_it_systick` — целевой fix, который гарантирует, что SysTick всегда будет обслужен правильными вызовами.
+## Abstract (Logic Synthesis)
+
+SysTick in STM32 is a critical interrupt: it powers both HAL timing and FreeRTOS scheduling. In some minimal LwIP configurations (as noted in file comments), the base `stm32h7xx_it.c` may not connect the correct handler, leading to dangerous consequences (up to infinite loop backtraces / WWDG).
+
+`stm32h7xx_it_systick` is the targeted fix, ensuring SysTick is always serviced with the correct calls.
 
 ## Logic Flow (ISR)
-В ISR:
-1. `HAL_IncTick()` — обновить HAL tick (нужно для `HAL_Delay`).
-2. `xPortSysTickHandler()` — уведомить FreeRTOS о тике.
 
-## Прерывания/регистры
-Это ISR-файл:
-- обработка идёт в обработчике прерывания SysTick,
-- регистры напрямую не трогаются; используются HAL/FreeRTOS hooks.
+In the ISR:
+1. `HAL_IncTick()` — Update HAL tick (required for `HAL_Delay`)
+2. `xPortSysTickHandler()` — Notify FreeRTOS about tick
 
-## Тайминги
-Вызовы должны быть быстрыми, иначе нарушится scheduling:
-- ISR ограничен двумя вызовами, без циклов/парсинга.
+## Interrupts/Registers
+
+This is an ISR file:
+- Processing happens in the SysTick interrupt handler
+- Registers are not directly manipulated; HAL/FreeRTOS hooks are used
+
+## Timings
+
+Calls should be fast, otherwise scheduling will be disrupted:
+- ISR is limited to two calls, no loops/parsing
 
 ## Dependencies
+
 - HAL: `HAL_IncTick`
 - FreeRTOS: `xPortSysTickHandler`
 
-## Связи
-- `stm32h7xx_it.md` — базовая реализация обработчиков в “полной” сборке.
+## Relations
 
+- `stm32h7xx_it.md` — Base implementation of handlers in "full" build
