@@ -2,45 +2,52 @@
 
 # `usbd_desc_cw.c` + `usbd_desc_cw.h`
 
-<brief>Модуль `usbd_desc_cw` формирует USB дескрипторы для устройства WebUSB: device/interface/BOS и строки (manufacturer/product/serial), включая WebUSB Platform Capability UUID, а также динамическую генерацию серийного номера на основе DEVICE_ID регистров STM32.</brief>
+<brief>Module `usbd_desc_cw` constructs USB descriptors for WebUSB device: device/interface/BOS and strings (manufacturer/product/serial), including WebUSB Platform Capability UUID, plus dynamic serial number generation based on STM32 DEVICE_ID registers.</brief>
 
-## Краткий обзор
-<brief>Модуль `usbd_desc_cw` формирует USB дескрипторы для устройства WebUSB: device/interface/BOS и строки (manufacturer/product/serial), включая WebUSB Platform Capability UUID, а также динамическую генерацию серийного номера на основе DEVICE_ID регистров STM32.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-USB-host для WebUSB должен получить корректный набор дескрипторов устройства, включая сведения, по которым Chrome/host API понимают, что это WebUSB девайс. `usbd_desc_cw` решает задачу: описывает VID/PID, формирует строки, предоставляет BOS/WebUSB capability, и генерирует serial number, чтобы хост различал устройства.
+<brief>Module `usbd_desc_cw` constructs USB descriptors for WebUSB device: device/interface/BOS and strings (manufacturer/product/serial), including WebUSB Platform Capability UUID, plus dynamic serial number generation based on STM32 DEVICE_ID registers.</brief>
 
-## Logic Flow (descriptor provider)
-Вызов USBD middleware идёт через функции-указатели в объекте `WEBUSB_Desc`:
-1. При запросе device/config/interface/string/BOS дескриптора:
-   - вернуть заранее подготовленные массивы (device/lang/bos и т.п.),
-   - строки manufacturer/product генерируются через `USBD_GetString(...)` на лету,
-   - serial string генерируется через `Get_SerialNum()`.
+## Abstract (Logic Synthesis)
+
+The USB host for WebUSB must receive a correct set of device descriptors, including information by which Chrome/host APIs recognize this as a WebUSB device. `usbd_desc_cw` solves this task: it describes VID/PID, constructs strings, provides BOS/WebUSB capability, and generates a serial number so the host can distinguish devices.
+
+## Logic Flow (Descriptor Provider)
+
+USBD middleware calls through function pointers in the `WEBUSB_Desc` object:
+1. When requesting device/config/interface/string/BOS descriptor:
+   - Return pre-prepared arrays (device/lang/bos, etc.)
+   - Manufacturer/product strings are generated via `USBD_GetString(...)` on-the-fly
+   - Serial string is generated via `Get_SerialNum()`
 2. `Get_SerialNum()`:
-   - читает `DEVICE_ID1/2/3`,
-   - комбинирует их (d0 += d2),
-   - конвертирует числа в hex-символы через `IntToUnicode()`.
+   - Read `DEVICE_ID1/2/3`
+   - Combine them (d0 += d2)
+   - Convert numbers to hex characters via `IntToUnicode()`
 
-Инварианты:
-| Параметр | Значение |
+Invariants:
+
+| Parameter | Value |
 |---|---|
 | VID/PID | `0x1209 / 0xC0DE` |
-| USB speed | `USBD_SPEED_FULL` (скорость используется в init) |
-| WebUSB UUID (BOS capability) | `3408b638-09a9-47a0-8bfd-a0768815b665` (в массиве дескриптора) |
+| USB speed | `USBD_SPEED_FULL` (speed used in init) |
+| WebUSB UUID (BOS capability) | `3408b638-09a9-47a0-8bfd-a0768815b665` (in descriptor array) |
 
-## Прерывания/регистры
-Нет ISR. Есть чтение device ID регистров (memory-mapped значения через макро-DEVICE_ID*).
+## Interrupts/Registers
 
-## Тайминги
-Нет специфических временных ограничений: дескрипторы выдаются при подключении/запросах host.
+No ISR. There is reading of device ID registers (memory-mapped values via DEVICE_ID* macros).
+
+## Timings
+
+No specific timing constraints: descriptors are returned during connect/host requests.
 
 ## Dependencies
-Прямые:
-- USBD middleware дескрипторные типы: `usbd_core.h`, `usbd_ctlreq.h`, `usbd_def.h`
-- Конфигурации: `usbd_conf_cw.h` (для size/macros)
-- Внешнее `WEBUSB_Desc` используется `usb_device.c` при `USBD_Init`.
 
-## Связи
-- `usb_device.md` вызывает `USBD_Init(... &WEBUSB_Desc ...)`.
-- `usb_webusb.md` содержит class/config descriptor (EP layout).
+Direct:
+- USBD middleware descriptor types: `usbd_core.h`, `usbd_ctlreq.h`, `usbd_def.h`
+- Configuration: `usbd_conf_cw.h` (for size/macros)
+- External `WEBUSB_Desc` used by `usb_device.c` in `USBD_Init`
 
+## Relations
+
+- `usb_device.md` — Calls `USBD_Init(... &WEBUSB_Desc ...)`
+- `usb_webusb.md` — Contains class/config descriptor (EP layout)

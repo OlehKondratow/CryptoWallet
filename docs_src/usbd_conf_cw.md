@@ -2,71 +2,82 @@
 
 # `usbd_conf_cw.c` + `usbd_conf_cw.h`
 
-<brief>Модуль `usbd_conf_cw` — это BSP/конфигурация для USB device middleware: он задаёт статический аллокатор для USBD, описывает memory hooks и настраивает MSP для PCD (GPIO alternate function, enable clock, NVIC priority/enable), а также мостит события HAL_PCD callback’ами в USBD_LL.</brief>
+<brief>Module `usbd_conf_cw` is the BSP/configuration layer for USB device middleware: it provides a static allocator for USBD, describes memory hooks, configures MSP for PCD (GPIO alternate function, clock enable, NVIC priority/enable), and bridges HAL_PCD callbacks to USBD_LL events.</brief>
 
-## Краткий обзор
-<brief>Модуль `usbd_conf_cw` — это BSP/конфигурация для USB device middleware: он задаёт статический аллокатор для USBD, описывает memory hooks и настраивает MSP для PCD (GPIO alternate function, enable clock, NVIC priority/enable), а также мостит события HAL_PCD callback’ами в USBD_LL.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-USB middleware (USBD) на STM32 требует связки:
-- hardware-independent layer (USBD core),
-- board/hardware-dependent layer (MSP init for PCD + перевод HAL событий в USBD_LL функции),
-- буферные ограничения/аллокаторы.
+<brief>Module `usbd_conf_cw` is the BSP/configuration layer for USB device middleware: it provides a static allocator for USBD, describes memory hooks, configures MSP for PCD (GPIO alternate function, clock enable, NVIC priority/enable), and bridges HAL_PCD callbacks to USBD_LL events.</brief>
 
-`usbd_conf_cw` обеспечивает эту “переходную” инфраструктуру. Бизнес-роль — сделать так, чтобы класс WebUSB в `usb_webusb` мог работать поверх корректно сконфигурированного USB peripheral (PCD) и предсказуемого набора memory hooks.
+## Abstract (Logic Synthesis)
 
-## Logic Flow (MSP init + callback bridging)
-Основные блоки:
-### MSP init/deinit для PCD
-При `HAL_PCD_MspInit(PCD_HandleTypeDef *pcdHandle)`:
-1. Проверить, что используется `USB1_OTG_HS` (ранний exit для других).
-2. Включить такт GPIOA.
-3. Настроить PA11/PA12:
-   - AF push-pull,
-   - pull: nopull,
-   - очень высокая скорость,
-   - alternate function `GPIO_AF10_OTG1_FS`.
-4. Включить такт `USB1_OTG_HS_CLK_ENABLE()`.
-5. Настроить NVIC:
-   - priority (6,0),
-   - включить IRQ `OTG_HS_IRQn`.
+STM32 USB middleware (USBD) requires a binding between:
+- Hardware-independent layer (USBD core)
+- Board/hardware-dependent layer (MSP init for PCD + translation of HAL events to USBD_LL functions)
+- Buffer constraints/allocators
 
-`HAL_PCD_MspDeInit` делает обратное: отключает clock, деинициализирует GPIO, выключает IRQ.
+`usbd_conf_cw` provides this "transition" infrastructure. Its business role is to ensure that the WebUSB class in `usb_webusb` can operate atop a correctly configured USB peripheral (PCD) with a predictable set of memory hooks.
 
-### Bridging callback’ов
-Функции `HAL_PCD_*Callback` переводят HAL-эквивалентные события в `USBD_LL_*`:
-- Setup stage -> `USBD_LL_SetupStage`,
-- DataOut stage -> `USBD_LL_DataOutStage`,
-- DataIn stage -> `USBD_LL_DataInStage`,
-- SOF/Reset/Suspend/Resume и т.д.
+## Logic Flow (MSP Init + Callback Bridging)
 
-### USBD static memory hooks
-Есть `usbd_webusb_mem` массив и функции:
-- `USBD_static_malloc(size)` возвращает указатель на статический буфер (без реальной аллокации),
-- `USBD_static_free(p)` no-op.
+Main blocks:
 
-## Прерывания/регистры
-Регистр-уровневые операции не производятся напрямую: конфигурация NVIC/GPIO выполняется через HAL.
-ISR реализованы в `stm32h7xx_it_usb.c` и зависят от корректной настройки IRQ в MSP init.
+### MSP Init/Deinit for PCD
 
-## Тайминги
-Тайминги задаются middleware-логикой USBD/HAL:
-| Элемент | Происхождение |
+In `HAL_PCD_MspInit(PCD_HandleTypeDef *pcdHandle)`:
+1. Check that `USB1_OTG_HS` is used (early exit for others)
+2. Enable GPIOA clock
+3. Configure PA11/PA12:
+   - AF push-pull
+   - Pull: nopull
+   - Very high speed
+   - Alternate function: `GPIO_AF10_OTG1_FS`
+4. Enable `USB1_OTG_HS_CLK_ENABLE()`
+5. Configure NVIC:
+   - Priority (6,0)
+   - Enable IRQ `OTG_HS_IRQn`
+
+`HAL_PCD_MspDeInit` does the reverse: disable clock, deinitialize GPIO, disable IRQ.
+
+### Callback Bridging
+
+Functions `HAL_PCD_*Callback` translate HAL-equivalent events to `USBD_LL_*`:
+- Setup stage → `USBD_LL_SetupStage`
+- DataOut stage → `USBD_LL_DataOutStage`
+- DataIn stage → `USBD_LL_DataInStage`
+- SOF/Reset/Suspend/Resume, etc.
+
+### USBD Static Memory Hooks
+
+There's `usbd_webusb_mem` array and functions:
+- `USBD_static_malloc(size)` returns pointer to static buffer (no real allocation)
+- `USBD_static_free(p)` is no-op
+
+## Interrupts/Registers
+
+Register-level operations are not performed directly: NVIC/GPIO configuration is done via HAL.
+ISRs are implemented in `stm32h7xx_it_usb.c` and depend on correct IRQ setup in MSP init.
+
+## Timings
+
+Timings are determined by USBD/HAL middleware logic:
+
+| Element | Origin |
 |---|---|
-| NVIC priority | фиксированная константа в MSP init |
-| buffer sizes FIFO | определяются в USBD конфигурации (см. PCD init) |
+| NVIC priority | Fixed constant in MSP init |
+| FIFO buffer sizes | Defined in USBD configuration (see PCD init) |
 
 ## Dependencies
-Прямые:
+
+Direct:
 - STM32 HAL: `HAL_PCD_*`, `HAL_GPIO_Init`, RCC/NVIC
 - USBD middleware: `usbd_core.h`, `usbd_ctlreq.h`, `usbd_ioreq.h`
-- WebUSB class конфигурации: `usb_webusb.h`.
+- WebUSB class configuration: `usb_webusb.h`
 
-Глобальные:
-- `hpcd_USB_FS` объявлен как external в `usb_device.c` и используется в IRQ обработчике.
+Global:
+- `hpcd_USB_FS` declared as external in `usb_device.c` and used in IRQ handler
 
-## Связи
-- `stm32h7xx_it_usb.md` (bridge в IRQ -> HAL_PCD_IRQHandler)
-- `usb_device.md` (init запускает middleware)
-- `usb_webusb.md` (класс/EP/команды)
+## Relations
 
+- `stm32h7xx_it_usb.md` — Bridge from IRQ to HAL_PCD_IRQHandler
+- `usb_device.md` — Middleware init startup
+- `usb_webusb.md` — Class/EP/commands
