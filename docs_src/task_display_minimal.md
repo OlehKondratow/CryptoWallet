@@ -4,49 +4,52 @@
 
 # `task_display_minimal.c`
 
-<brief>Модуль `task_display_minimal` — облегчённая реализация UI/лога для `minimal-lwip`: он минимизирует нагрузку на SSD1306, зеркалит сообщения в UART и пишет короткий хвост в `g_display_ctx`, чтобы дисплей можно было обновлять только по необходимости.</brief>
+<brief>The `task_display_minimal` module is a lightweight UI/logging implementation for `minimal-lwip`: it minimizes SSD1306 load, mirrors messages to UART, and writes a short log tail to `g_display_ctx`, so the display can be updated only when necessary.</brief>
 
-## Краткий обзор
-<brief>Модуль `task_display_minimal` — облегчённая реализация UI/лога для `minimal-lwip`: он минимизирует нагрузку на SSD1306, зеркалит сообщения в UART и пишет короткий хвост в `g_display_ctx`, чтобы дисплей можно было обновлять только по необходимости.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-Для учебных сборок, где важнее быстрый bring-up LwIP, чем полноценная графика, проект использует “минимальный” дисплей. Его бизнес-роль — обеспечить разработчикам и пользователю минимальный визуальный статус сети (IP/DHCP) и логовый tail, не блокируя слишком агрессивно I2C и не тратя ресурсы на сложную UI-state машину.
+The `task_display_minimal` module is a lightweight UI/logging implementation for `minimal-lwip`: it minimizes SSD1306 load, mirrors messages to UART, and writes a short log tail to `g_display_ctx`, so the display can be updated only when necessary.
 
-## Logic Flow (minimal OLED loop)
-Поток задачи:
-1. В начале логируется старт и (при `!SKIP_OLED`) выполняется быстрый вывод “+ LwIP / DHCP...”.
-2. Далее задача входит в вечный цикл:
-   - мигает LED1 как “alive”,
-   - опционально раз в 5 секунд печатает “Disp: alive” (если `LWIP_ALIVE_LOG`),
-   - если OLED разрешён (`!SKIP_OLED`), периодически читает `g_display_ctx` под mutex и обновляет экран (IP + хвост лога),
-   - задержка `500ms` между обновлениями.
+## Logic Flow (Minimal OLED Loop)
 
-### Сценарии ветвления по флагам
-| Флаг | Эффект в дисплее |
-|---|---|
-| `SKIP_OLED=1` | I2C/SSD1306 трафик полностью выключается; задача остаётся только с alive/логированием. |
-| `LWIP_ALIVE_LOG` | Добавляет периодический UART+log alive, чтобы видеть живость сети. |
+Task flow:
+1. At startup, logs start message and (if `!SKIP_OLED`) performs quick output "+ LwIP / DHCP..."
+2. Then task enters infinite loop:
+   - blinks LED1 as "alive" indicator
+   - optionally prints "Disp: alive" every 5 seconds (if `LWIP_ALIVE_LOG`)
+   - if OLED enabled (`!SKIP_OLED`), periodically reads `g_display_ctx` under mutex and updates screen (IP + log tail)
+   - delay `500ms` between updates
 
-## Прерывания/регистры
-Прямых регистров/ISR нет. Единственная “низкоуровневая” часть — прямые вызовы SSD1306-драйвера поверх I2C, защищённые mutex’ом.
+### Flag Branching Scenarios
 
-## Тайминги и условия ветвления
-| Операция | Значение |
-|---|---:|
-| создание/старт | `vTaskDelay(100ms)` после старта дисплея |
+| Flag | Effect on Display |
+|------|------------------|
+| `SKIP_OLED=1` | I2C/SSD1306 traffic completely disabled; task remains with only alive/logging |
+| `LWIP_ALIVE_LOG` | Adds periodic UART+log alive to see network liveliness |
+
+## Interrupts and Registers
+
+No direct registers/ISR. Only "low-level" part: direct SSD1306 driver calls over I2C, protected by mutex.
+
+## Timings and Branching Conditions
+
+| Operation | Value |
+|-----------|-------|
+| creation/startup | `vTaskDelay(100ms)` after display start |
 | I2C/ctx mutex | `xSemaphoreTake(..., 50ms)` / `xSemaphoreTake(..., 20ms)` |
-| цикл обновления OLED | `vTaskDelay(500ms)` |
-| очередь UI | в minimal-сборке не используется (функции UI merge заглушены) |
+| OLED update loop | `vTaskDelay(500ms)` |
+| UI queue | not used in minimal build (UI merge functions stubbed) |
 
 ## Dependencies
-- Глобальная структура UI-контеkста: `g_display_ctx` и `g_display_ctx_mutex` (для log line + IP строки).
-- Общий I2C ресурс: `g_i2c_mutex`.
-- Логирование: `UART_Log()` (через `Task_Display_Log()`).
-- SSD1306: `ssd1306_*` + `Font_6x8`.
-- LED policy (косвенно): мигает LED1 как индикатор живости дисплея.
 
-## Связи
-- `task_display.md` (полная версия UI)
-- `task_net.md` / `app_ethernet_cw.md` (формируют IP/DHCP, который отображается)
-- `hw_init.md` (I2C/SSD1306 базовая инициализация в main пути)
+- Global UI context structure: `g_display_ctx` and `g_display_ctx_mutex` (for log line + IP string)
+- Shared I2C resource: `g_i2c_mutex`
+- Logging: `UART_Log()` (via `Task_Display_Log()`)
+- SSD1306: `ssd1306_*` + `Font_6x8`
+- LED policy (indirect): blinks LED1 as display liveliness indicator
 
+## Module Relationships
+
+- `task_display.md` (full UI version)
+- `task_net.md` / `app_ethernet_cw.md` (provide IP/DHCP that gets displayed)
+- `hw_init.md` (I2C/SSD1306 basic init in main path)

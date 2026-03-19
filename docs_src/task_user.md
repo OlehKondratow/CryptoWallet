@@ -3,59 +3,62 @@
 
 # `task_user.c` + `task_user.h`
 
-<brief>Модуль `task_user` реализует физическую UX-логику для кнопки USER (PC13): делает debounce, различает короткое нажатие (Confirm) и длинное удержание (~2.5s) как Reject и сигналит это в `task_sign` через `g_user_event_group`.</brief>
+<brief>The `task_user` module implements physical UX logic for the USER button (PC13): performs debounce, distinguishes short press (Confirm) from long hold (~2.5s) as Reject, and signals this to `task_sign` via `g_user_event_group`.</brief>
 
-## Краткий обзор
-<brief>Модуль `task_user` реализует физическую UX-логику для кнопки USER (PC13): делает debounce, различает короткое нажатие (Confirm) и длинное удержание (~2.5s) как Reject и сигналит это в `task_sign` через `g_user_event_group`.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-Ключевая бизнес-задача `task_user` — отделить “человеческое” подтверждение (кнопка с механикой и задержками) от криптографического и сетевого потока. Так `task_sign` получает дискретные события подтверждения/отклонения и может безопасно продолжать следующий шаг без постоянного опроса GPIO.
+The `task_user` module implements physical UX logic for the USER button (PC13): performs debounce, distinguishes short press (Confirm) from long hold (~2.5s) as Reject, and signals this to `task_sign` via `g_user_event_group`.
 
-## Logic Flow (button state machine)
-Подход: периодический poll с фильтрацией стабильности.
+## Logic Flow (Button State Machine)
 
-Триггеры и пороги:
-| Параметр | Значение |
-|---:|---:|
+Approach: periodic polling with stability filtering.
+
+Triggers and thresholds:
+
+| Parameter | Value |
+|-----------|-------|
 | `POLL_MS` | 20ms |
 | Debounce | 50ms |
 | Long press | 2500ms |
 
-Состояния (неявно, через переменные):
-1. Idle (кнопка не нажата).
-2. Pressed-Stabilizing (кнопка нажата, идёт накопление стабильных тиков).
-3. Confirm-Fired (короткое нажатие подтверждено при отпускании).
-4. Reject-Fired (длинное удержание отклоняет сразу во время удержания).
+States (implicit, via variables):
+1. Idle (button not pressed)
+2. Pressed-Stabilizing (button pressed, accumulating stable ticks)
+3. Confirm-Fired (short press confirmed on release)
+4. Reject-Fired (long hold rejects immediately during hold)
 
-Правила:
-1. Пока кнопка остаётся нажатой — накапливается `btn_stable_ticks`.
-2. Если удержание достигает `LONG_PRESS_MS` и действие ещё не “fired” — ставится `EVENT_USER_REJECTED`.
-3. При отпускании:
-   - если длительность в диапазоне `[DEBOUNCE_MS, LONG_PRESS_MS)` и действие ещё не “fired” — ставится `EVENT_USER_CONFIRMED`,
-   - затем сбрасываются флаги длительности.
+Rules:
+1. While button remains pressed — accumulates `btn_stable_ticks`
+2. If hold reaches `LONG_PRESS_MS` and action not yet "fired" — sets `EVENT_USER_REJECTED`
+3. On release:
+   - if duration in range `[DEBOUNCE_MS, LONG_PRESS_MS)` and action not yet "fired" — sets `EVENT_USER_CONFIRMED`
+   - then resets duration flags
 
-## Прерывания/регистры
-Прямых ISR нет: модуль работает как FreeRTOS task и читает состояние GPIO через HAL.
-Особенность таймингов — точность на уровне `POLL_MS` (20ms): событие может “сдвинуться” не более чем на один тик.
+## Interrupts and Registers
 
-## Тайминги и условия ветвления
-| Ветвление | Условие | Результат |
-|---|---|---|
+No direct ISR: module works as FreeRTOS task and reads GPIO state via HAL.
+Timing precision at level of `POLL_MS` (20ms): event may shift no more than one tick.
+
+## Timings and Branching Conditions
+
+| Branch | Condition | Result |
+|--------|-----------|--------|
 | Reject | `last_press_duration >= 2500 && !action_fired` | set `EVENT_USER_REJECTED` |
-| Confirm | `DEBOUNCE_MS <= last_press_duration < 2500 && !action_fired` при отпускании | set `EVENT_USER_CONFIRMED` |
-| Debounce | пока длительность не достигла 50ms | события не ставятся |
+| Confirm | `DEBOUNCE_MS <= last_press_duration < 2500 && !action_fired` on release | set `EVENT_USER_CONFIRMED` |
+| Debounce | while duration not reached 50ms | no events set |
 
 ## Dependencies
-Прямые:
-- Вход: `USER_KEY_GPIO_PORT`, `USER_KEY_PIN`, `USER_KEY_PRESSED` (из `main.h`).
-- События: `g_user_event_group` + биты `EVENT_USER_CONFIRMED`, `EVENT_USER_REJECTED` (из `wallet_shared.h` / архитектуры задач).
-- Логирование: `Task_Display_Log`.
 
-Косвенные:
-- `task_sign` ожидает эти event bits и переводит систему в подтверждающий/отклоняющий сценарий.
+Direct:
+- Input: `USER_KEY_GPIO_PORT`, `USER_KEY_PIN`, `USER_KEY_PRESSED` (from `main.h`)
+- Events: `g_user_event_group` + bits `EVENT_USER_CONFIRMED`, `EVENT_USER_REJECTED` (from `wallet_shared.h` / task architecture)
+- Logging: `Task_Display_Log`
 
-## Связи
-- `task_sign.md` (consumer `g_user_event_group`)
-- `task_io.md` (индикация security alert после решения)
-- `task_display.md` (подписи “Confirm/Reject” через лог-слой)
+Indirect:
+- `task_sign` waits for these event bits and transitions system to confirm/reject scenario
 
+## Module Relationships
+
+- `task_sign.md` (consumer of `g_user_event_group`)
+- `task_io.md` (security alert indication after decision)
+- `task_display.md` (Confirm/Reject labels via logging layer)

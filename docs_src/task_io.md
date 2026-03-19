@@ -3,50 +3,51 @@
 
 # `task_io.c` + `task_io.h`
 
-<brief>Модуль `task_io` отвечает за визуальные индикаторы безопасности и статуса системы: он периодически обновляет LED1 как “alive”, управляет LED2 как сетевым индикатором (в зависимости от сборки LwIP) и включает LED3 при наличии security alert.</brief>
+<brief>The `task_io` module manages visual safety and status indicators: it periodically updates LED1 as "alive", manages LED2 as network indicator (depending on LwIP build), and enables LED3 when security alert is present.</brief>
 
-## Краткий обзор
-<brief>Модуль `task_io` отвечает за визуальные индикаторы безопасности и статуса системы: он периодически обновляет LED1 как “alive”, управляет LED2 как сетевым индикатором (в зависимости от сборки LwIP) и включает LED3 при наличии security alert.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-`task_io` — это изоляция “политики индикации” от всей остальной логики. Он не влияет на криптографию, не читает кнопку и не инициирует сеть — он лишь отображает состояние через GPIO, используя один общий входной сигнал: `g_security_alert`. Такое разделение уменьшает риск гонок и делает UX предсказуемым при разных режимах сборки (с LwIP или без него).
+The `task_io` module manages visual safety and status indicators: it periodically updates LED1 as "alive", manages LED2 as network indicator (depending on LwIP build), and enables LED3 when security alert is present.
 
-## Logic Flow (simple control loop)
-Основной цикл:
-1. Один раз после старта включает LED1 и выключает LED3.
-2. В дальнейшем каждую `POLL_MS=100ms`:
-   - LED1 принудительно поддерживается в “ON” состоянии (heartbeat),
-   - LED2 периодически переключается только в сборке без LwIP (`!USE_LWIP`),
-   - LED3 выставляется по условию `g_security_alert != 0`.
+## Logic Flow (Simple Control Loop)
 
-Условная логика LED2:
-| Условие сборки | LED2 поведение |
-|---|---|
-| `USE_LWIP=1` | LED2 не переключается (в текущей логике — всегда false после init). |
-| `USE_LWIP=0` | LED2 мигает с периодом, зависящим от счётчика тиков (`tick_count/25`). |
+Main loop:
+1. Once after startup, turns on LED1 and turns off LED3
+2. Subsequently every `POLL_MS=100ms`:
+   - LED1 forcibly maintained in "ON" state (heartbeat)
+   - LED2 periodically toggled only in build without LwIP (`!USE_LWIP`)
+   - LED3 set by condition `g_security_alert != 0`
 
-## Прерывания/регистры
-Прямых ISR и работы с регистрами нет. Используются HAL GPIO записи:
-- `HAL_GPIO_WritePin(LED*_GPIO_PORT, LED*_PIN, level)`.
+LED2 conditional logic:
 
-## Тайминги и условия ветвления
-| Параметр | Значение |
-|---:|---:|
-| период цикла | `POLL_MS=100ms` |
+| Build Condition | LED2 Behavior |
+|-----------------|---------------|
+| `USE_LWIP=1` | LED2 not toggled (in current logic — always false after init) |
+| `USE_LWIP=0` | LED2 blinks with period depending on tick counter (`tick_count/25`) |
+
+## Interrupts and Registers
+
+No direct ISR and register work. Uses HAL GPIO writes:
+- `HAL_GPIO_WritePin(LED*_GPIO_PORT, LED*_PIN, level)`
+
+## Timings and Branching Conditions
+
+| Parameter | Value |
+|-----------|-------|
+| loop period | `POLL_MS=100ms` |
 | stack/priority | `IO_STACK_SIZE=128`, `IO_PRIORITY = idle+1` |
-| источник состояния LED3 | `g_security_alert` |
+| LED3 state source | `g_security_alert` |
 
 ## Dependencies
-Прямые зависимости:
-- GPIO: макросы пинов из `main.h` (`LED1_*`, `LED2_*`, `LED3_*`).
-- Глобальная переменная: `g_security_alert` (из `wallet_shared.h` в текущем архитектурном наборе).
-- Логирование: `Task_Display_Log("IO init")` — то есть через дисплейный слой (UART+OLED).
 
-Косвенно:
-- `task_sign` и/или `task_security` меняют `g_security_alert`, а задача IO только отражает.
+Direct dependencies:
+- Global flag: `g_security_alert` (from `task_sign` or `task_security`)
+- GPIO defines: `LED1_GPIO_PORT/PIN`, `LED2_GPIO_PORT/PIN`, `LED3_GPIO_PORT/PIN` (from `main.h`)
+- HAL: `stm32h7xx_hal.h` for `HAL_GPIO_WritePin()`
+- FreeRTOS: `vTaskDelay()`, task creation
 
-## Связи
-- `task_sign.md`, `task_security.md` (источник `g_security_alert`)
-- `task_user.md` (откуда берётся подтверждение/отклонение)
-- `task_display.md` (лог-слой, который печатает “IO init” и т.п.)
+## Module Relationships
 
+- `task_sign.md` (source of `g_security_alert` on errors)
+- `task_security.md` (alternate source of security state)
+- `hw_init.md` (GPIO init for LEDs)
