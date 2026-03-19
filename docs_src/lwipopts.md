@@ -2,51 +2,58 @@
 
 # `Core/Inc/lwipopts.h`
 
-<brief>Заголовок `lwipopts` задаёт compile-time параметры LwIP для проекта: включает IPv4/TCP/DHCP/DNS/SNTP, настраивает размер heap’а (`LWIP_RAM_HEAP_POINTER` и `MEM_SIZE`), параметры TCP буферов/окна, а также привязывает установку времени из SNTP к `time_service_set_epoch()`.</brief>
+<brief>Header `lwipopts` defines compile-time configuration for LwIP: enables IPv4/TCP/DHCP/DNS/SNTP, configures heap size (`LWIP_RAM_HEAP_POINTER` and `MEM_SIZE`), TCP buffer/window parameters, and binds SNTP time updates to `time_service_set_epoch()`.</brief>
 
-## Краткий обзор
-<brief>Заголовок `lwipopts` задаёт compile-time параметры LwIP для проекта: включает IPv4/TCP/DHCP/DNS/SNTP, настраивает размер heap’а (`LWIP_RAM_HEAP_POINTER` и `MEM_SIZE`), параметры TCP буферов/окна, а также привязывает установку времени из SNTP к `time_service_set_epoch()`.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-Встроенный стек — это не только “какие пакеты” отправляются, но и “какие ресурсы и структуры” доступны. `lwipopts.h` фиксирует эти ресурсы и поведение:
-- какие подсистемы LwIP компилируются,
-- где располагается heap в памяти,
-- как устроены буферы PBUF и TCP окна,
-- как происходит интеграция SNTP с приложением через `SNTP_SET_SYSTEM_TIME(sec)`.
+<brief>Header `lwipopts` defines compile-time configuration for LwIP: enables IPv4/TCP/DHCP/DNS/SNTP, configures heap size (`LWIP_RAM_HEAP_POINTER` and `MEM_SIZE`), TCP buffer/window parameters, and binds SNTP time updates to `time_service_set_epoch()`.</brief>
 
-Бизнес-задача config-файла — согласовать LwIP с ограничениями STM32H7 (память D2 SRAM и взаимодействие с кэшем/MPU) и с приложением `time_service`.
+## Abstract (Logic Synthesis)
 
-## Logic Flow (compile-time “state machine”)
-Это не runtime state machine. Логика — в наборах макросов, которые определяют поведение подсистем:
+An embedded network stack is not just "what packets are sent" but also "what resources and structures are available". `lwipopts.h` fixes these resources and behaviors:
 
-| Группа параметров | Ключевые макросы | Что задают |
+- Which LwIP subsystems are compiled
+- Where the heap is located in memory
+- How PBUF and TCP window buffers are structured
+- How SNTP integrates with the application via `SNTP_SET_SYSTEM_TIME(sec)`
+
+The config file's business goal: reconcile LwIP with STM32H7 constraints (D2 SRAM memory and cache/MPU interaction) and with the application's `time_service`.
+
+## Logic Flow (Compile-time "State Machine")
+
+This is not a runtime state machine. Logic is in sets of macros that define subsystem behavior:
+
+| Parameter Group | Key Macros | Purpose |
 |---|---|---|
-| UART alive logging | `LWIP_ALIVE_LOG` | печать “alive” с периодом в LwIP path |
-| Heap/Memory | `MEM_ALIGNMENT`, `MEM_SIZE`, `LWIP_RAM_HEAP_POINTER` | размер/размещение кучи LwIP |
-| Threading | `TCPIP_THREAD_*`, `DEFAULT_THREAD_STACKSIZE` | параметры internal TCP/IP thread’ов |
-| Protocol enable | `LWIP_IPV4`, `LWIP_TCP`, `LWIP_DHCP`, `LWIP_SNTP`, `LWIP_DNS` | какие подсистемы компилируются |
-| Timing integration | `SNTP_SET_SYSTEM_TIME(sec)` | вызывает `time_service_set_epoch(sec)` |
-| Link callback | `LWIP_NETIF_LINK_CALLBACK` (через `LWIP_NO_LINK_THREAD`) | как LwIP сообщает изменения линка |
+| UART alive logging | `LWIP_ALIVE_LOG` | Print "alive" periodically in LwIP path |
+| Heap/Memory | `MEM_ALIGNMENT`, `MEM_SIZE`, `LWIP_RAM_HEAP_POINTER` | Heap size and placement |
+| Threading | `TCPIP_THREAD_*`, `DEFAULT_THREAD_STACKSIZE` | Internal TCP/IP thread parameters |
+| Protocol enable | `LWIP_IPV4`, `LWIP_TCP`, `LWIP_DHCP`, `LWIP_SNTP`, `LWIP_DNS` | Which subsystems compile |
+| Timing integration | `SNTP_SET_SYSTEM_TIME(sec)` | Calls `time_service_set_epoch(sec)` |
+| Link callback | `LWIP_NETIF_LINK_CALLBACK` (via `LWIP_NO_LINK_THREAD`) | How LwIP reports link changes |
 
-## Прерывания/регистры
-Нет. Это конфигурация компиляции.
+## Interrupts/Registers
 
-## Тайминги и критичные условия
-| Параметр | Значение | Контекст |
-|---|---:|---|
-| `SNTP_UPDATE_DELAY` | `15*60*1000` мс | период обновления времени |
-| `MEM_SIZE` | `14*1024` | влияет на возможность LwIP обслужить соединения и буферы |
-| TCP буфер/окно | `TCP_SND_BUF`, `TCP_WND` | отражается на пропускной способности |
+None. This is compile-time configuration.
+
+## Timings and Critical Conditions
+
+| Parameter | Value | Context |
+|---|---|---|
+| `SNTP_UPDATE_DELAY` | `15*60*1000` ms | Time update period |
+| `MEM_SIZE` | `14*1024` bytes | Affects LwIP connection serving and buffer allocation |
+| TCP buffer/window | `TCP_SND_BUF`, `TCP_WND` | Impacts throughput |
 
 ## Dependencies
-Прямые:
-- `time_service_set_epoch()` (декларация из `time_service`).
 
-Косвенно:
-- `hw_init` для корректного MPU/cache в ветке `USE_LWIP` (LwIP heap размещён в `0x30004000`, как часть MPU setup).
+Direct:
+- `time_service_set_epoch()` declaration from `time_service.h`
 
-## Связи
-- `hw_init.md`: почему heap/caches должны быть согласованы с LwIP.
-- `time_service.md`: обработка SNTP epoch через `time_service_set_epoch`.
-- `task_net.md` / `app_ethernet_cw.md`: runtime логика DHCP и старт SNTP.
+Indirect:
+- `hw_init` for proper MPU/cache in `USE_LWIP` branch (LwIP heap placed at `0x30004000` as part of MPU setup)
 
+## Relations
+
+- `hw_init.md` — Why heap/caches must align with LwIP
+- `time_service.md` — SNTP epoch handling via `time_service_set_epoch`
+- `task_net.md` / `app_ethernet_cw.md` — Runtime DHCP and SNTP startup logic

@@ -1,31 +1,37 @@
-\page stm32h7xx_it_usb "stm32h7xx_it_usb: OTG_HS IRQ -> HAL_PCD_IRQHandler"
+\page stm32h7xx_it_usb "stm32h7xx_it_usb: OTG_HS IRQ → HAL_PCD_IRQHandler"
 
 # `stm32h7xx_it_usb.c`
 
-<brief>Файл `stm32h7xx_it_usb` реализует обработчик прерывания OTG HS для режима WebUSB: в ISR он вызывает `HAL_PCD_IRQHandler` для `hpcd_USB_FS`, чтобы USB device middleware мог корректно обслуживать transfer’ы endpoint’ов.</brief>
+<brief>File `stm32h7xx_it_usb` implements the OTG HS interrupt handler for WebUSB mode: the ISR calls `HAL_PCD_IRQHandler` for `hpcd_USB_FS` so USB device middleware can properly service endpoint transfers.</brief>
 
-## Краткий обзор
-<brief>Файл `stm32h7xx_it_usb` реализует обработчик прерывания OTG HS для режима WebUSB: в ISR он вызывает `HAL_PCD_IRQHandler` для `hpcd_USB_FS`, чтобы USB device middleware мог корректно обслуживать transfer’ы endpoint’ов.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-USB transfer’ы и события link/endpoint changes приходят через IRQ. В проекте WebUSB класс живёт поверх STM32 USB device middleware, а middleware ожидает, что конкретный IRQ будет маршрутизирован в HAL/PCL обработчики. Этот файл обеспечивает именно такую связку: OTG_HS IRQ -> HAL handler.
+<brief>File `stm32h7xx_it_usb` implements the OTG HS interrupt handler for WebUSB mode: the ISR calls `HAL_PCD_IRQHandler` for `hpcd_USB_FS` so USB device middleware can properly service endpoint transfers.</brief>
 
-## Logic Flow (ISR routing)
-1. В условной компиляции (`USE_WEBUSB==1`) объявлен внешний handle `hpcd_USB_FS`.
+## Abstract (Logic Synthesis)
+
+USB transfers and link/endpoint change events arrive via IRQ. In this project, the WebUSB class sits atop STM32 USB device middleware, and the middleware expects a specific IRQ to be routed to HAL/PCD handlers. This file provides exactly that routing: OTG_HS IRQ → HAL handler.
+
+## Logic Flow (ISR Routing)
+
+1. Under conditional compilation (`USE_WEBUSB==1`), external handle `hpcd_USB_FS` is declared
 2. `OTG_HS_IRQHandler()`:
-   - вызвать `HAL_PCD_IRQHandler(&hpcd_USB_FS)`.
+   - Call `HAL_PCD_IRQHandler(&hpcd_USB_FS)`
 
-## Прерывания/регистры
-Это ISR. Регистры напрямую не трогаются; HAL забирает ответственность за очистку IRQ флагов и продвигает state машинку USB middleware.
+## Interrupts/Registers
 
-## Тайминги
-ISR должен быть коротким: здесь только один вызов в HAL.
+This is an ISR. Registers are not directly manipulated; HAL takes responsibility for clearing IRQ flags and advancing the USB middleware state machine.
+
+## Timings
+
+ISR should be short: only a single HAL call here.
 
 ## Dependencies
+
 - STM32 HAL USB device: `HAL_PCD_IRQHandler`
-- Обработчик ожидается настроенным в `usbd_conf_cw.c` (NVIC enable/priority).
+- Handler is expected to be configured in `usbd_conf_cw.c` (NVIC enable/priority)
 
-## Связи
-- `usbd_conf_cw.md` настраивает IRQ.
-- `usb_webusb.md` получает DataOut/DataIn через middleware.
+## Relations
 
+- `usbd_conf_cw.md` — Configures IRQ
+- `usb_webusb.md` — Receives DataOut/DataIn via middleware
