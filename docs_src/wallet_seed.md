@@ -3,37 +3,42 @@
 
 # `wallet_seed.c`
 
-<brief>Модуль `wallet_seed` — заглушка для `get_wallet_seed()` при `USE_TEST_SEED=1`: возвращает BIP-39 seed из известного тестового мnemonic'a "abandon...about", **никогда не для реальных средств**.</brief>
+<brief>The `wallet_seed` module is a stub for `get_wallet_seed()` when `USE_TEST_SEED=1`: returns a BIP-39 seed from a known test mnemonic "abandon...about", **never for real funds**.</brief>
 
-## Краткий обзор
-<brief>Модуль `wallet_seed` — заглушка для `get_wallet_seed()` при `USE_TEST_SEED=1`: возвращает BIP-39 seed из известного тестового мnemonic'a "abandon...about", **никогда не для реальных средств**.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-Для обучения и тестирования нужен воспроизводимый seed. `wallet_seed` содержит жёсткозакодированный стандартный BIP-39 тестовый vector (адрес 1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA), что позволяет воспроизводить подписи и проверять signing path. Это **development-only** — production надо заменить на secure element или encrypted flash. Бизнес-роль — обеспечить детерминированный seed при разработке.
+<brief>The `wallet_seed` module is a stub for `get_wallet_seed()` when `USE_TEST_SEED=1`: returns a BIP-39 seed from a known test mnemonic "abandon...about", **never for real funds**.</brief>
+
+## Abstract (Logic Synthesis)
+
+For learning and testing, a reproducible seed is needed. `wallet_seed` contains a hardcoded standard BIP-39 test vector (address `1LqBGSKuX5yYUonjxT5qGfpUsXKYYWeabA`), allowing signature reproduction and signing-path verification. This is **development-only** — production must replace it with a secure element or encrypted flash storage. Business role: provide deterministic seed during development.
 
 ## Logic Flow
 
-1. При `USE_CRYPTO_SIGN=1` и `USE_TEST_SEED=1` компилируется реальная реализация.
-2. Функция `get_wallet_seed()` просто вызывает `mnemonic_to_seed()` из trezor-crypto с известной строкой.
-3. Копирует результат 64 байта в выходной буфер и очищает локальный seed через `memzero()`.
-4. При любом другом флаге — компиляется пустой stub, и `get_wallet_seed()` (weak symbol в `task_sign.c`) просто возвращает -1.
+1. When `USE_CRYPTO_SIGN=1` and `USE_TEST_SEED=1`, the real implementation is compiled.
+2. Function `get_wallet_seed()` simply calls `mnemonic_to_seed()` from trezor-crypto with the known string.
+3. Copies the resulting 64 bytes into the output buffer and clears the local seed via `memzero()`.
+4. Under any other flag — an empty stub is compiled, and `get_wallet_seed()` (weak symbol in `task_sign.c`) simply returns -1.
 
-## Прерывания/регистры
-Нет ISR/регистров: просто строковое преобразование и memcpy.
+## Interrupts/Registers
 
-## Тайминги и условия ветвления
+No ISRs or registers: just string transformation and memcpy.
 
-| Сборка | Поведение |
+## Timings and Branch Conditions
+
+| Build | Behavior |
 |---|---|
-| `USE_CRYPTO_SIGN=1` и `USE_TEST_SEED=1` | Возвращает seed из "abandon...about" |
-| Любое другое | Weak stub: -1 (не реализовано) |
+| `USE_CRYPTO_SIGN=1` and `USE_TEST_SEED=1` | Returns seed from "abandon...about" |
+| Any other | Weak stub: -1 (not implemented) |
 
 ## Dependencies
-- `bip39.h` из trezor-crypto (мnemonic_to_seed).
-- `memzero.h` для очистки локального буфера.
-- Используется из `task_sign.c` при подписании.
 
-## Связи
-- `task_sign.md` (consumer в signing pipeline)
-- `crypto_wallet.md` (тезуры над trezor)
+- `bip39.h` from trezor-crypto (`mnemonic_to_seed`)
+- `memzero.h` for clearing local buffer
+- Used from `task_sign.c` during signing
+
+## Relations
+
+- `task_sign.md` (consumer in signing pipeline)
+- `crypto_wallet.md` (wrapper over trezor)
 - `memzero.md` (seed cleanup)
