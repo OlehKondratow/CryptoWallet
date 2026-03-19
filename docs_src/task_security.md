@@ -3,58 +3,61 @@
 
 # `task_security.c` + `task_security.h`
 
-<brief>Модуль `task_security` хранит “legacy/mock” вариант signing FSM для bring-up и сравнения: он не используется в основном пути (`main.c` не вызывает его), но реализует схожую автоматику подтверждения и подменяет криптографию на заглушки.</brief>
+<brief>The `task_security` module holds a "legacy/mock" variant of the signing FSM for bring-up and comparison: it is not used in the main path (`main.c` does not call it), but implements similar confirmation automation and replaces cryptography with stubs.</brief>
 
-## Краткий обзор
-<brief>Модуль `task_security` хранит “legacy/mock” вариант signing FSM для bring-up и сравнения: он не используется в основном пути (`main.c` не вызывает его), но реализует схожую автоматику подтверждения и подменяет криптографию на заглушки.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-Это модуль для обучения и диагностики: вместо “реальной” криптографии он моделирует шаги подписи (SHA-256/ECDSA) и показывает, как может выглядеть FSM при ожидании confirm/reject. Бизнес-задача `task_security` — сохранить структуру потоков (queue -> ждём USER -> “подпись/отказ”) и при этом безопасно отображать состояние через `g_display_ctx`, не затрагивая основную production-схему `task_sign`.
+The `task_security` module holds a "legacy/mock" variant of the signing FSM for bring-up and comparison: it is not used in the main path (`main.c` does not call it), but implements similar confirmation automation and replaces cryptography with stubs.
 
-## Logic Flow (legacy FSM)
-Внутренняя state machine реализована как:
-1. Локальная переменная `state` стартует в `SIGNING_IDLE`.
-2. В режиме IDLE задача забирает payload из `g_tx_queue` (timeout 200ms) и переводит состояние в `SIGNING_RECEIVED`.
-3. Далее на каждом тике выполняется одна итерация `fsm_signing_step`, которая обрабатывает:
-   - RECEIVED: выполняет mock-hash и переводит в WAIT_CONFIRM,
-   - WAIT_CONFIRM: ждёт event bits confirm/reject с таймаутом 30s,
-   - IN_PROGRESS: выполняет mock-sign и переводит в DONE (или ERROR),
-4. Когда достигнуты терминальные состояния (DONE/REJECTED/ERROR), задача очищает tx и возвращается в IDLE.
+## Logic Flow (Legacy FSM)
 
-### Отображение состояния
-В модуле предусмотрен helper “update signing on display context”, который мапит состояние FSM в поля `g_display_ctx` (locked/valid/pending).
+Internal state machine is implemented as:
+1. Local variable `state` starts in `SIGNING_IDLE`
+2. In IDLE mode, the task takes payload from `g_tx_queue` (timeout 200ms) and transitions to `SIGNING_RECEIVED`
+3. Then on each tick, one iteration of `fsm_signing_step` is executed, which processes:
+   - RECEIVED: performs mock-hash and transitions to WAIT_CONFIRM
+   - WAIT_CONFIRM: waits for confirm/reject event bits with 30s timeout
+   - IN_PROGRESS: performs mock-sign and transitions to DONE (or ERROR)
+4. When reaching terminal states (DONE/REJECTED/ERROR), the task clears tx and returns to IDLE
 
-## Прерывания/регистры
-ISR/reg-доступ отсутствует. Модуль использует:
-- event group ожидание,
-- очередь payload,
-- мем-очистку `memzero()` для sensitive буферов на путях выхода.
+### Display State Update
 
-## Тайминги и ветвления
-| Параметр | Значение |
-|---:|---:|
-| timeout на queue receive | 200ms |
-| таймаут confirm/reject | 30000ms |
-| обработка | по итерациям цикла (без строгого периодического sleep, кроме задержек, зависящих от очередей/ожиданий) |
+The module includes a helper "update signing on display context" which maps FSM state to `g_display_ctx` fields (locked/valid/pending).
 
-Ключевое ветвление:
-- reject/timeout -> SIGNING_REJECTED (или возвращение через терминальное состояние)
-- reject absent -> CONFIRM -> SIGNING_IN_PROGRESS -> SIGNING_DONE
+## Interrupts and Registers
+
+No ISR/register access. Module uses:
+- event group wait
+- queue payload
+- memory clear `memzero()` for sensitive buffers on exit paths
+
+## Timings and Branches
+
+| Parameter | Value |
+|-----------|-------|
+| timeout on queue receive | 200ms |
+| confirm/reject timeout | 30000ms |
+| processing | per loop iterations (no strict periodic sleep, only delays from queues/waits) |
+
+Key branching:
+- reject/timeout → SIGNING_REJECTED (or return via terminal state)
+- no reject → CONFIRM → SIGNING_IN_PROGRESS → SIGNING_DONE
 
 ## Dependencies
-Прямые зависимости:
-- `g_tx_queue` / `wallet_tx_t` (вход)
+
+Direct dependencies:
+- `g_tx_queue` / `wallet_tx_t` (input)
 - `g_user_event_group` / `EVENT_USER_CONFIRMED/REJECTED` (UX signal)
-- `g_display_ctx_mutex` и `g_display_ctx` (вывод статусов)
+- `g_display_ctx_mutex` and `g_display_ctx` (status output)
 - `memzero()` (sanitization)
-- Мок-крипто функции внутри модуля (не реальные крипто-периферии).
+- Mock-crypto functions inside module (not real crypto peripherals)
 
-Из архитектурных особенностей:
-- в `main.c` `Task_Security_Create()` не вызывается; поэтому модуль по умолчанию не влияет на production-путь.
+Architectural peculiarity:
+- In `main.c`, `Task_Security_Create()` is not called; so the module by default does not affect production path
 
-## Связи
-- `task_sign.md` (production FSM, реальная криптография)
+## Module Relationships
+
+- `task_sign.md` (production FSM, real cryptography)
 - `task_user.md` (source event bits)
-- `wallet_shared.md` (общий контракт состояний FSM + event bits)
-- `task_display.md` (контекст/лог-слой отображения)
-
+- `wallet_shared.md` (common FSM state contract + event bits)
+- `task_display.md` (context/logging display layer)

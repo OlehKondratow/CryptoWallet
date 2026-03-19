@@ -6,73 +6,74 @@
 
 # `task_net.c` + `task_net.h`
 
-<brief>Модуль `task_net` — сетевой фасад приложения: запускает LwIP/Ethernet, поднимает HTTP-сервер на порту 80, парсит JSON/form POST запросы (`POST /tx`), валидирует транзакции и отправляет их на подпись через `g_tx_queue`.</brief>
+<brief>The `task_net` module is the network facade of the application: it brings up LwIP/Ethernet, starts an HTTP server on port 80, parses JSON/form POST requests (`POST /tx`), validates transactions, and sends them for signing via `g_tx_queue`.</brief>
 
-## Краткий обзор
-<brief>Модуль `task_net` — сетевой фасад приложения: запускает LwIP/Ethernet, поднимает HTTP-сервер на порту 80, парсит JSON/form POST запросы (`POST /tx`), валидирует транзакции и отправляет их на подпись через `g_tx_queue`.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-`task_net` — это точка входа для всех внешних запросов подписания: хост (ПК, мобиль, веб-интерфейс) подключается по Ethernet, отправляет JSON или форму с адресом/суммой/валютой, а модуль парсит, валидирует, показывает на SSD1306 и ставит задачу в очередь для signing task. Без LwIP (`USE_LWIP=0`) модуль — no-op. Бизнес-роль — быть "врата в микроконтроллер" для сетевого клиента.
+The `task_net` module is the entry point for all external signing requests: a host (PC, mobile, web interface) connects via Ethernet, sends JSON or form data with address/amount/currency, and the module parses, validates, shows on SSD1306, and queues for the signing task. Without LwIP (`USE_LWIP=0`), the module is a no-op. Business role: be the "gateway to the microcontroller" for the network client.
 
-## Logic Flow (HTTP server FSM)
+## Logic Flow (HTTP Server FSM)
 
-1. **Инициализация:**
-   - `Task_Net_Create()` из `main.c` создаёт FreeRTOS задачу с приоритетом `NET_PRIORITY`.
-   - Задача `net_task()` инициализирует `tcpip_init()` (LwIP ядро).
-   - Настраивает netif: DHCP (если `LWIP_DHCP=1`) или static IP (из `main.h`).
-   - Устанавливает callback на `ethernet_link_status_updated()`.
-   - Стартует отдельный поток `http_server_thread()` с 16K стеком.
+1. **Initialization:**
+   - `Task_Net_Create()` from `main.c` creates a FreeRTOS task with priority `NET_PRIORITY`
+   - The `net_task()` initializes `tcpip_init()` (LwIP core)
+   - Configures netif: DHCP (if `LWIP_DHCP=1`) or static IP (from `main.h`)
+   - Sets callback on `ethernet_link_status_updated()`
+   - Starts separate `http_server_thread()` with 16K stack
 
 2. **HTTP Server FSM:**
-   - Создаёт TCP слушатель на порту 80.
-   - Цикл: `netconn_accept()` ждёт входящего соединения.
-   - Получает всё данные в одном вызове `netconn_recv()` (2-сек timeout).
+   - Creates TCP listener on port 80
+   - Loop: `netconn_accept()` waits for incoming connection
+   - Receives all data in single `netconn_recv()` call (2-sec timeout)
 
-3. **Request parsing:**
-   - Парсит HTTP первую строку: `GET /path` или `POST /path`.
-   - Для `GET /ping`: возвращает "pong".
-   - Для `GET /`: возвращает HTML форму для интерфейса.
-   - Для `GET /tx/signed`: возвращает JSON с последней подписью (`g_last_sig` + флаг `g_last_sig_ready`).
-   - Для `POST /tx`:
-     - Парсит body как JSON (ищет `"recipient"`, `"amount"`, `"currency"`) или form (`recipient=...&amount=...&currency=...`).
-     - Валидирует через `tx_request_validate()`.
-     - Если валидно, отправляет в `g_tx_queue` для signing и обновляет display через `g_display_queue`.
+3. **Request Parsing:**
+   - Parses HTTP first line: `GET /path` or `POST /path`
+   - For `GET /ping`: returns "pong"
+   - For `GET /`: returns HTML form for interface
+   - For `GET /tx/signed`: returns JSON with last signature (`g_last_sig` + flag `g_last_sig_ready`)
+   - For `POST /tx`:
+     - Parses body as JSON (looks for `"recipient"`, `"amount"`, `"currency"`) or form (`recipient=...&amount=...&currency=...`)
+     - Validates via `tx_request_validate()`
+     - If valid, sends to `g_tx_queue` for signing and updates display via `g_display_queue`
 
-4. **Ответы:**
-   - HTTP 200 с HTML/JSON/text.
-   - HTTP 404 для неизвестных путей.
+4. **Responses:**
+   - HTTP 200 with HTML/JSON/text
+   - HTTP 404 for unknown paths
 
-## Прерывания/регистры
-`task_net` не трогает ISR/регистры напрямую. Используется LwIP API (netconn, netbuf). Взаимодействие с HAL только через `ethernet_link_status_updated()` (из `app_ethernet_cw.c`).
+## Interrupts and Registers
 
-## Тайминги и условия ветвления
+`task_net` does not touch ISR/registers directly. Uses LwIP API (netconn, netbuf). Interaction with HAL only through `ethernet_link_status_updated()` (from `app_ethernet_cw.c`).
 
-| Endpoint | Метод | Поведение |
-|---|---|---|
-| `/ping` | GET | Немедленно вернуть "pong" |
-| `/` | GET | Отправить HTML форму |
-| `/tx/signed` | GET | Отправить JSON с последней подписью или статусом |
-| `/tx` | POST | Парсить body (JSON или form), валидировать, отправить в `g_tx_queue` |
-| Другое | GET/POST | HTTP 404 |
+## Timings and Branching Conditions
+
+| Endpoint | Method | Behavior |
+|----------|--------|----------|
+| `/ping` | GET | Immediately return "pong" |
+| `/` | GET | Send HTML form |
+| `/tx/signed` | GET | Send JSON with last signature or status |
+| `/tx` | POST | Parse body (JSON or form), validate, send to `g_tx_queue` |
+| Other | GET/POST | HTTP 404 |
 
 Timing:
-- HTTP request timeout: 2 сек (netconn_set_recvtimeout).
-- Queue send timeout: 100 мс (pdMS_TO_TICKS(100)).
-- Task main loop: 2 сек delay для обновления display (IP после DHCP).
+- HTTP request timeout: 2 sec (netconn_set_recvtimeout)
+- Queue send timeout: 100 ms (pdMS_TO_TICKS(100))
+- Task main loop: 2 sec delay for display update (IP after DHCP)
 
 ## Dependencies
-Прямые зависимости:
-- **FreeRTOS:** xTaskCreate, xQueueSend, vTaskDelay, xSemaphoreTake/Give.
-- **LwIP:** netconn API, tcpip_init, netif.
-- **wallet_shared.h:** `wallet_tx_t`, `g_tx_queue`.
-- **tx_request_validate.h:** валидация перед очередью.
-- **task_display.h:** `Task_Display_Log()`, `g_display_queue`, `g_display_ctx_mutex`.
-- **app_ethernet.h:** `ethernet_link_status_updated()` callback.
-- Глобальные из других модулей: `g_last_sig[]`, `g_last_sig_ready` (из `task_sign`).
 
-## Связи
-- `wallet_shared.md` (структура wallet_tx_t и очередь)
-- `tx_request_validate.md` (validation перед enqueueing)
-- `task_sign.md` (consumer из g_tx_queue)
+Direct dependencies:
+- **FreeRTOS:** xTaskCreate, xQueueSend, vTaskDelay, xSemaphoreTake/Give
+- **LwIP:** netconn API, tcpip_init, netif
+- **wallet_shared.h:** `wallet_tx_t`, `g_tx_queue`
+- **tx_request_validate.h:** validation before queue
+- **task_display.h:** `Task_Display_Log()`, `g_display_queue`, `g_display_ctx_mutex`
+- **app_ethernet.h:** `ethernet_link_status_updated()` callback
+- Globals from other modules: `g_last_sig[]`, `g_last_sig_ready` (from `task_sign`)
+
+## Module Relationships
+
+- `wallet_shared.md` (wallet_tx_t structure and queue)
+- `tx_request_validate.md` (validation before enqueueing)
+- `task_sign.md` (consumer from g_tx_queue)
 - `task_display.md` (display updates)
-- `app_ethernet_cw.md` (link callbacks и LED feedback)
+- `app_ethernet_cw.md` (link callbacks and LED feedback)

@@ -6,77 +6,82 @@
 
 # `task_sign.c` + `task_sign.h`
 
-<brief>Модуль `task_sign` реализует основной pipeline подписания: он получает валидированный запрос из очереди, формирует детерминированный input для SHA-256, ждёт пользовательское подтверждение/отклонение и, при успехе, сохраняет компактную подпись и подготавливает её для сетевого/USB ответа.</brief>
+<brief>The `task_sign` module implements the core signing pipeline: it receives a validated request from a queue, forms a deterministic input for SHA-256, waits for user confirmation/rejection, and upon success, stores a compact signature and prepares it for network/USB response.</brief>
 
-## Краткий обзор
-<brief>Модуль `task_sign` реализует основной pipeline подписания: он получает валидированный запрос из очереди, формирует детерминированный input для SHA-256, ждёт пользовательское подтверждение/отклонение и, при успехе, сохраняет компактную подпись и подготавливает её для сетевого/USB ответа.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-`task_sign` — центральная точка “политики и криптографии” в проекте: он соединяет данные от сети с подтверждением человека и криптографической операцией подписи. Его бизнес-роль — гарантировать, что криптооперации не стартуют до валидности входных строк и не завершаются без явного `Confirm` события от `task_user`. При ошибках он переводит систему в безопасный UX режим (через `g_security_alert` и обновление display context).
+The `task_sign` module is the central point of "policy and cryptography" in the project: it connects network data with human confirmation and the cryptographic signing operation. Its business role is to guarantee that cryptographic operations do not start before input string validity and do not complete without an explicit `Confirm` event from `task_user`. On errors, it transitions the system to a safe UX mode (via `g_security_alert` and display context update).
 
-## Logic Flow (explicit signing FSM)
-Внутренняя логика оформлена через enum `signing_state_t` и локальную переменную `state`. Смысловые состояния и переходы:
+## Logic Flow (Explicit Signing FSM)
+
+Internal logic is organized through the `signing_state_t` enum and a local `state` variable. Semantic states and transitions:
 
 ### 1) SIGNING_IDLE
-Шаги:
-1. Ожидание транзакции из `g_tx_queue` (timeout 200ms).
-2. Валидация host payload через `tx_request_validate`.
-3. При ошибке валидации: логирование, выставление `g_security_alert=1`, очистка временных буферов и возврат в `IDLE`.
-4. При успехе: переход в `SIGNING_RECEIVED`.
+
+Steps:
+1. Wait for transaction from `g_tx_queue` (timeout 200ms).
+2. Validate host payload via `tx_request_validate`.
+3. On validation error: log, set `g_security_alert=1`, clear temporary buffers, and return to `IDLE`.
+4. On success: transition to `SIGNING_RECEIVED`.
 
 ### 2) SIGNING_RECEIVED
-Шаги:
-1. Обновление display context (валюта/amount, безопасный locked=false пока идёт ожидание confirm).
-2. Формирование детерминированного SHA-256 input из полей recipient/amount/currency.
-3. Расчёт SHA-256 (ошибка -> security_alert=1 и возврат в IDLE).
-4. Переход в `SIGNING_WAIT_CONFIRM`.
+
+Steps:
+1. Update display context (currency/amount, safe locked=false while waiting for confirmation).
+2. Form deterministic SHA-256 input from recipient/amount/currency fields.
+3. Calculate SHA-256 (error → security_alert=1 and return to IDLE).
+4. Transition to `SIGNING_WAIT_CONFIRM`.
 
 ### 3) SIGNING_WAIT_CONFIRM
-Шаги:
-1. Очистка event group битов `EVENT_USER_CONFIRMED | EVENT_USER_REJECTED`.
-2. Ожидание одного из событий с таймаутом `CONFIRM_TIMEOUT_MS=30000ms`.
-3. Ветвления:
-   - `REJECTED` -> лог “Rejected”, очистка, возврат в IDLE
-   - без `CONFIRMED` (timeout) -> лог “Timeout”, очистка, возврат в IDLE
-4. На confirm:
-   - получение seed (`get_wallet_seed`) и derive ключа m/44'/0'/0'/0/0,
-   - криптоподпись `crypto_sign_btc_hash(...)`,
-   - сохранение `g_last_sig` и установка `g_last_sig_ready=1`,
-   - обнуление буферов sensitive,
-   - сброс `g_security_alert=0`,
-   - обновление display context на locked/valid и очистка pending флага через `UI_ClearPending()`.
 
-## Прерывания/регистры
-Прямых ISR/reg-уровневых операций нет. Однако есть критичный security аспект:
-- sensitive буферы очищаются через `memzero()` на всех путях выхода (включая ветви ошибок).
-- ключевые “точки” безопасного поведения завязаны на event group и очереди.
+Steps:
+1. Clear event group bits `EVENT_USER_CONFIRMED | EVENT_USER_REJECTED`.
+2. Wait for one of the events with timeout `CONFIRM_TIMEOUT_MS=30000ms`.
+3. Branches:
+   - `REJECTED` → log "Rejected", clear, return to IDLE
+   - no `CONFIRMED` (timeout) → log "Timeout", clear, return to IDLE
+4. On confirm:
+   - get seed (`get_wallet_seed`) and derive key m/44'/0'/0'/0/0
+   - cryptographic signature `crypto_sign_btc_hash(...)`
+   - store `g_last_sig` and set `g_last_sig_ready=1`
+   - zero sensitive buffers
+   - reset `g_security_alert=0`
+   - update display context to locked/valid and clear pending flag via `UI_ClearPending()`
 
-## Тайминги и условия ветвления
-| Момент | Значение | Что контролирует |
-|---|---:|---|
-| ожидание payload из очереди | 200ms | не блокировать навсегда при пустой очереди |
-| ожидание mutex display context | 50ms | избегать зависаний при проблемах с UI mutex |
-| подтверждение пользователя | 30000ms | timeout отказает в подписании |
-| очередь/merge display pending | через `UI_ClearPending()` | переход UX из confirm-режима |
+## Interrupts and Registers
+
+No direct ISR/register-level operations. However, there is a critical security aspect:
+- Sensitive buffers are cleared via `memzero()` on all exit paths (including error branches)
+- Key "safe behavior" checkpoints are tied to event groups and queues
+
+## Timings and Branching Conditions
+
+| Moment | Value | What It Controls |
+|--------|-------|------------------|
+| queue payload wait | 200ms | avoid blocking forever on empty queue |
+| display context mutex wait | 50ms | avoid hangs on UI mutex problems |
+| user confirmation | 30000ms | timeout denies the signature |
+| queue/merge display pending | via `UI_ClearPending()` | transition UX from confirm mode |
 
 ## Dependencies
-Прямые зависимости:
-- Входные данные: `g_tx_queue` (`wallet_tx_t`).
-- Пользовательский сигнал: `g_user_event_group` + биты `EVENT_USER_CONFIRMED/REJECTED`.
-- Валидация: `tx_request_validate()` и `tx_validate_result_str()`.
-- Крипто-слой: `crypto_hash_sha256()`, `crypto_derive_btc_m44_0_0_0_0()`, `crypto_sign_btc_hash()`.
-- Seed: `get_wallet_seed()` (weak stub в этом модуле; реальная реализация может быть в `wallet_seed.c` при тестовых сборках).
-- UI/логирование: `Task_Display_Log()`, `UI_ClearPending()` и protected доступ к `g_display_ctx`.
 
-Глобальные структуры/флаги, которые меняются:
+Direct dependencies:
+- Input data: `g_tx_queue` (`wallet_tx_t`)
+- User signal: `g_user_event_group` + bits `EVENT_USER_CONFIRMED/REJECTED`
+- Validation: `tx_request_validate()` and `tx_validate_result_str()`
+- Crypto layer: `crypto_hash_sha256()`, `crypto_derive_btc_m44_0_0_0_0()`, `crypto_sign_btc_hash()`
+- Seed: `get_wallet_seed()` (weak stub in this module; real implementation may be in `wallet_seed.c` for test builds)
+- UI/logging: `Task_Display_Log()`, `UI_ClearPending()` and protected access to `g_display_ctx`
+
+Global structures/flags that are modified:
 - `g_last_sig`, `g_last_sig_ready`
 - `g_security_alert`
-- поля `g_display_ctx` (currency/amount/safe_locked/signature_valid)
+- fields of `g_display_ctx` (currency/amount/safe_locked/signature_valid)
 
-## Связи
-- `task_net.md` (создаёт/кладёт payload в `g_tx_queue`)
-- `tx_request_validate.md` (валидация)
+## Module Relationships
+
+- `task_net.md` (creates/puts payload in `g_tx_queue`)
+- `tx_request_validate.md` (validation)
 - `task_user.md` (confirm/reject event bits)
-- `task_display.md` (рендер pending/UX)
-- `crypto_wallet.md` / `memzero.md` (крипто и sanitization)
-
+- `task_display.md` (pending/UX rendering)
+- `crypto_wallet.md` / `memzero.md` (crypto and sanitization)

@@ -7,65 +7,67 @@
 
 # `crypto_wallet.c` + `crypto_wallet.h`
 
-<brief>Модуль `crypto_wallet` обёртывает trezor-crypto библиотеку: он поднимает STM32 RNG с энтропийным перемешиванием, предоставляет BIP-39 mnemonics, BIP-32 HDNode derivation и ECDSA secp256k1 подпись для стандартного пути Bitcoin m/44'/0'/0'/0/0.</brief>
+<brief>The `crypto_wallet` module wraps the trezor-crypto library: it brings up STM32 RNG with entropy mixing, provides BIP-39 mnemonics, BIP-32 HDNode derivation, and ECDSA secp256k1 signing for the standard Bitcoin path m/44'/0'/0'/0/0.</brief>
 
-## Краткий обзор
-<brief>Модуль `crypto_wallet` обёртывает trezor-crypto библиотеку: он поднимает STM32 RNG с энтропийным перемешиванием, предоставляет BIP-39 mnemonics, BIP-32 HDNode derivation и ECDSA secp256k1 подпись для стандартного пути Bitcoin m/44'/0'/0'/0/0.</brief>
+## Overview
 
-## Abstract (Synthèse логики)
-`crypto_wallet` — это слой адаптации между проектом и trezor-crypto: с одной стороны, используется RNG (STM32 TRNG + софтверный entropy pool для стабильности), с другой — экспортируются "простые" API для вышестоящих уровней (sign_hash, derive_key, mnemonic_from_entropy). При `USE_CRYPTO_SIGN=0` все функции становятся заглушками, а вместо trezor идёт `sha256_minimal` для хеширования. Бизнес-роль — дать одну точку контроля для всей криптографии в проекте.
+The `crypto_wallet` module is an adaptation layer between the project and trezor-crypto: on one side, RNG is used (STM32 TRNG + software entropy pool for stability), on the other side, "simple" APIs are exported for higher levels (sign_hash, derive_key, mnemonic_from_entropy). When `USE_CRYPTO_SIGN=0`, all functions become stubs, and instead of trezor, `sha256_minimal` is used for hashing. Business role: provide one control point for all cryptography in the project.
 
-## Logic Flow (RNG + Crypto pipeline)
+## Logic Flow (RNG + Crypto Pipeline)
 
-### RNG инициализация
-1. `crypto_rng_init()` вызывается один раз из `main.c`.
-2. Берёт текущий `HAL_GetTick()` и применяет LFSR-трансформацию для нелинейной mix-функции.
-3. Результат XOR'ится в глобальный `s_rng_entropy_pool`.
-4. Далее каждый вызов `random_buffer()` (из trezor-crypto):
-   - пытается взять слово из STM32 TRNG (если `hrng.Instance` валиден),
-   - XOR'ит с `s_rng_entropy_pool` и обновляет pool через LCG (мултипликативный конгруэнтный генератор).
-   - Копирует результат в буфер вывода.
+### RNG Initialization
 
-### Криптографический пути
+1. `crypto_rng_init()` is called once from `main.c`.
+2. Takes the current `HAL_GetTick()` and applies LFSR transformation for nonlinear mix function.
+3. Result is XORed into global `s_rng_entropy_pool`.
+4. Then each call to `random_buffer()` (from trezor-crypto):
+   - tries to get a word from STM32 TRNG (if `hrng.Instance` is valid)
+   - XORs with `s_rng_entropy_pool` and updates pool via LCG (multiplicative congruential generator)
+   - copies result to output buffer
 
-**При `USE_CRYPTO_SIGN=1`:**
-- BIP-39: мnemonic_from_data (16 байт -> 12 слов)
-- BIP-32: hdnode_from_seed, затем цепочка derive операций для m/44'/0'/0'/0/0
-- ECDSA: ecdsa_sign_digest с secp256k1, компактный формат r||s (64 байта)
+### Cryptographic Paths
 
-**При `USE_CRYPTO_SIGN=0`:**
-- Все функции возвращают -1 (не поддерживается)
-- SHA-256 падает на `sha256_minimal`
+**When `USE_CRYPTO_SIGN=1`:**
+- BIP-39: mnemonic_from_data (16 bytes → 12 words)
+- BIP-32: hdnode_from_seed, then chain of derive operations for m/44'/0'/0'/0/0
+- ECDSA: ecdsa_sign_digest with secp256k1, compact format r||s (64 bytes)
 
-## Прерывания/регистры
-Модуль использует HAL RNG и `HAL_GetTick()` для энтропии, но прямых ISR/регистров не трогает. Единственное — в `crypto_sign_btc_hash()` после подписи вызывается `memzero()` для очистки приватного ключа.
+**When `USE_CRYPTO_SIGN=0`:**
+- All functions return -1 (not supported)
+- SHA-256 falls back to `sha256_minimal`
 
-## Тайминги и условия ветвления
+## Interrupts and Registers
 
-| Функция | Когда работает | Ошибка |
-|---|---|---|
-| `crypto_rng_init` | один раз при старте (optional при USE_CRYPTO_SIGN=0) | -1 если hrng.Instance NULL |
-| `random_buffer` | постоянно, под запросы trezor | no-op при NULL buf/len |
-| `crypto_entropy_to_mnemonic_12` | при setup; читает 16 байт энтропии | -1 если USE_CRYPTO_SIGN=0 или bad buffer |
-| `crypto_derive_btc_m44_0_0_0_0` | при подписании; берёт seed (64 байта) | -1 при ошибке derivation или USE_CRYPTO_SIGN=0 |
-| `crypto_sign_btc_hash` | при подписании; берёт key+digest | -1 при ошибке sign или USE_CRYPTO_SIGN=0; очищает ключ после |
-| `crypto_hash_sha256` | при формировании input для подписи | -1 при NULL input/output |
+Module uses HAL RNG and `HAL_GetTick()` for entropy, but does not touch direct ISR/registers. The only detail — in `crypto_sign_btc_hash()` after signing, `memzero()` is called to clear the private key.
+
+## Timings and Branching Conditions
+
+| Function | When It Works | Error |
+|----------|---------------|-------|
+| `crypto_rng_init` | once at startup (optional when USE_CRYPTO_SIGN=0) | -1 if hrng.Instance NULL |
+| `random_buffer` | constantly on trezor requests | no-op if NULL buf/len |
+| `crypto_entropy_to_mnemonic_12` | on setup; reads 16 bytes entropy | -1 if USE_CRYPTO_SIGN=0 or bad buffer |
+| `crypto_derive_btc_m44_0_0_0_0` | on signing; takes seed (64 bytes) | -1 on derivation error or USE_CRYPTO_SIGN=0 |
+| `crypto_sign_btc_hash` | on signing; takes key+digest | -1 on sign error or USE_CRYPTO_SIGN=0; clears key after |
+| `crypto_hash_sha256` | when forming input for signature | -1 if NULL input/output |
 
 ## Dependencies
-Прямые зависимости:
-- **trezor-crypto:** `bip39.h`, `bip32.h`, `ecdsa.h`, `secp256k1.h`, `rand.h`, `sha2.h` (при `USE_CRYPTO_SIGN`).
-- **sha256_minimal.h** (fallback при `USE_CRYPTO_SIGN=0`).
-- **memzero.h** для обнуления sensitive буферов.
-- **HAL RNG:** `stm32h7xx_hal.h` и инициализация `hrng` из `hw_init.c`.
 
-Глобальные:
-- `s_rng_entropy_pool` (локальный статический пул),
-- `hrng` (из `hw_init` по слабой ссылке),
-- `random_buffer()` (hook, который trezor-crypto ожидает).
+Direct dependencies:
+- **trezor-crypto:** `bip39.h`, `bip32.h`, `ecdsa.h`, `secp256k1.h`, `rand.h`, `sha2.h` (when `USE_CRYPTO_SIGN`)
+- **sha256_minimal.h** (fallback when `USE_CRYPTO_SIGN=0`)
+- **memzero.h** to clear sensitive buffers
+- **HAL RNG:** `stm32h7xx_hal.h` and `hrng` initialization from `hw_init.c`
 
-## Связи
+Globals:
+- `s_rng_entropy_pool` (local static pool)
+- `hrng` (from `hw_init` via weak reference)
+- `random_buffer()` (hook that trezor-crypto expects)
+
+## Module Relationships
+
 - `task_sign.md` (consumer seed derivation + signing)
 - `memzero.md` (key clearing)
 - `sha256_minimal.md` (fallback hashing)
 - `wallet_seed.md` (seed management)
-- `hw_init.md` (RNG инициализация)
+- `hw_init.md` (RNG initialization)
