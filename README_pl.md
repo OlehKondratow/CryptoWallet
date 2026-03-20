@@ -9,6 +9,104 @@ Aplikacja mikrokontrolera do bezpiecznego podpisywania transakcji Bitcoin na STM
 
 ---
 
+## 🔄 Architektura Kernel & System Software
+
+### Organizacja Kernel FreeRTOS
+
+**Takt systemowy i planowanie:**
+- **Wyjątek SysTick**: Skonfigurowany do uruchamiania co 1 ms
+- **Przepływ obsługi taktu:**
+  1. Zapisz stan CPU (rejestry zapisane przez sprzęt Cortex-M7)
+  2. Wywołaj `xTaskIncrementTick()` → zaktualizuj globalny licznik taktów
+  3. Oceń gotowość wszystkich zadań z wygasłymi opóźnieniami
+  4. Znajdź gotowe zadanie z najwyższym priorytetem
+  5. Jeśli inne niż bieżące → zaznacz wyjątek PendSV
+  6. Powróć z przerwania
+  7. Wyjątek PendSV → przełączenie kontekstu (zapisz stary, załaduj nowy)
+- **Czas przełączenia kontekstu**: ~5-10 mikrosekund (przyspieszony sprzętowo)
+- **Kontekst zawiera**: 16 rejestrów (R0-R15), XPSR (flagi), rejestr sterowania
+
+**Kolejka gotowości zadań:**
+- **Struktura danych**: 32 połączone listy (jeden na poziom priorytetu 0-31)
+- **O(1) wyszukiwanie**: Gotowe zadanie o najwyższym priorytecie jest natychmiast znane
+- **Lock-free** (w kontekście ISR): Używa atomowych operacji na polach bitowych
+- **Przykład**: Jeśli priorytety 22, 21, 20 mają gotowe zadania, harmonogram wybiera 22
+
+**Mechanizm opóźnienia zadań:**
+- **Lista timerów**: Posortowana po czasie przebudzenia
+- **Obsługa przepełnienia**: Używa 16-bitowego owijania timera (FreeRTOS v10+)
+- **Przepływ przebudzenia**: Lista timerów → kolejka gotowości → następna ocena SysTick
+
+**Dziedziczenie priorytetu (Mutex):**
+- **Problem**: Inwersja priorytetu (niski priorytet trzymający mutex blokuje wysoki)
+- **Rozwiązanie**: Gdy zadanie czeka na mutex, tymczasowo podnieś priorytet właściciela blokady
+- **Przykład w kodzie**: `crypto_lock` mutex używa dziedziczenia priorytetu
+  - Jeśli task_net czeka na crypto_lock, task_sign otrzymuje podwyższony priorytet
+  - Po zwolnieniu przez task_sign, priorytet spada z powrotem
+
+### Wzorce synchronizacji zadań
+
+**Komunikacja oparta na kolejce (tx_request_queue → task_sign):**
+```c
+// Producent (task_net):
+xQueueSend(tx_request_queue, &tx_request, portMAX_DELAY);
+// Blokuje jeśli kolejka pełna (zwykle nie, głębokość=10)
+
+// Konsument (task_sign):
+xQueueReceive(tx_request_queue, &tx_request, portMAX_DELAY);
+// Blokuje do otrzymania wiadomości
+// Atomowo usuwa wiadomość z kolejki
+// Budzi się nawet jeśli inne zadania wyższe priorytety (bo mają dane)
+```
+
+**Grupa zdarzeń (user_confirm_event):**
+```c
+// Czekający (task_sign):
+xEventGroupWaitBits(user_confirm_event, CONFIRM_BIT, 
+                    pdTRUE,      // wyczyść przy wyjściu
+                    pdTRUE,      // czekaj wszystkie bity
+                    xTicksToWait); // timeout: 30 sekund
+
+// Sygnalizujący (task_user):
+xEventGroupSetBitsFromISR(user_confirm_event, CONFIRM_BIT, &xHigherPriorityTaskWoken);
+```
+
+**Mutex z timeoutem (crypto_lock):**
+```c
+// Zadanie zabiera blokadę z timeoutem 5 sekund:
+if (xSemaphoreTake(crypto_lock, pdMS_TO_TICKS(5000)) == pdTRUE) {
+    // Wykonaj operację kryptograficzną
+    xSemaphoreGive(crypto_lock);
+} else {
+    // Timeout - inne zadanie trzyma blokadę zbyt długo
+    // Akcja: błąd odpowiedzi lub ponowna próba
+}
+```
+
+### Analiza ograniczeń czasu rzeczywistego
+
+**Hard Real-Time (nie można pominąć):**
+- **SysTick** → termin 1 ms (sprzęt)
+- **Opóźnienie przerwania** → maksymalnie ~10 µs (ograniczenie rdzenia ARM)
+- **Sekcja krytyczna**: Wyłączone przerwania ≤ 100 µs (zapobiega długiemu jitterowi)
+
+**Soft Real-Time (opuszczone terminy degradują, nie krytyczne):**
+- **Odpowiedź na naciśnięcie przycisku**: ≤ 100 ms dopuszczalne (debounce + interwał)
+- **Wyświetlacz OLED**: ≤ 100 ms dopuszczalne (postrzeganie oka)
+- **Odpowiedź HTTP**: ≤ 1 sekunda dopuszczalna (interakcja użytkownika)
+
+**Analiza blokowania zadań:**
+- **task_sign zablokowana w WAIT_USER**: Zadanie najwyższego priorytetu zablokowane
+  - Inne zadania działają: task_net, task_display, task_io, task_user
+  - Ruch sieciowy nadal obsługiwany (przez task_net)
+  - Brak zagłodzenia (wszystkie zadania otrzymują czas CPU)
+- **Planowanie po priorytecie gwarantuje**:
+  - Naciśnięcie przycisku (task_user, priorytet 22) zawsze wyparcia inne
+  - Podpisywanie (priorytet 21) wyparcia sieć (priorytet 20)
+  - Sieć nie głoduje niższych priorytetów
+
+---
+
 ## 🔐 Jądro i bezpieczeństwo
 
 Logika podpisywania, zarządzanie kluczami, walidacja i operacje kryptograficzne.
@@ -138,6 +236,81 @@ Build-time parameters: I2C1 binding, address 0x3C, geometry 128×32, font 6×8.
 **Pełna dokumentacja:** [docs_src/ssd1306_conf.md](docs_src/ssd1306_conf.md)
 
 **Nagłówki:** hw_init.h, main.h, lwipopts.h
+
+---
+
+## 💾 Stos System Software
+
+**Architektura warstwowa:**
+```
+┌─────────────────────────────────────┐
+│  Warstwa aplikacji (task_*.c)       │ ← Kod zadań
+│  - Podpisywanie, Sieć, Wyświetlacz  │
+├─────────────────────────────────────┤
+│  Warstwa Middleware                 │
+│  - LwIP (sieć)                      │
+│  - trezor-crypto (kryptografia)     │
+│  - FreeRTOS (jądro)                 │
+├─────────────────────────────────────┤
+│  Warstwa HAL (hal/)                 │ ← Sterowniki
+│  - UART, GPIO, I2C, SPI, USB, Eth   │
+├─────────────────────────────────────┤
+│  Warstwa CMSIS (stm32h7xx_hal_*.h)  │ ← Definicje rejestrów
+├─────────────────────────────────────┤
+│  Rdzeń ARM Cortex-M7                │ ← CPU
+│  - Pamięć cache, MPU, FPU, itd      │
+└─────────────────────────────────────┘
+```
+
+**Zależności modułów:**
+```
+task_sign.c
+├─ FreeRTOS (queue, mutex, event)
+├─ crypto_wallet.c
+│  └─ trezor-crypto
+│     └─ secp256k1, BIP-39/32
+└─ memzero.c (bezpieczne czyszczenie bufora)
+
+task_net.c
+├─ FreeRTOS (queue)
+├─ LwIP
+│   ├─ Stos TCP/IP
+│   ├─ Klient DHCP
+│   └─ Serwer HTTP
+└─ eth_phy_driver.c
+
+task_display.c
+├─ FreeRTOS (queue)
+└─ i2c_driver.c → SSD1306 OLED
+
+task_user.c
+├─ FreeRTOS (event, queue)
+└─ gpio_driver.c → GPIO_PC13 (przycisk)
+```
+
+---
+
+## 🔒 Uwagi dotyczące bezpieczeństwa (poziom systemowy)
+
+**Bezpieczeństwo pamięci:**
+- **Ochrona przed przepełnieniem stosu**: Stałe rozmiary stosu zapobiegają niekontrolowanemu wzrostowi
+- **Fragmentacja sterty**: Oddzielna sterta zmniejsza przewidywalność stanu stosu
+- **Dane wrażliwe**: Czyszczone za pośrednictwem volatile pisania (zapobiega optymalizacji kompilatora)
+
+**Bezpieczeństwo czasu rzeczywistego:**
+- **Ataki czasowe**: Operacje kryptograficzne są zmienne z RNG (timing nieprzewidywalny)
+- **Analiza energii**: Trudna (wymagany oscyloskop, niepraktyczne dla przeglądu kodu)
+- **Iniekcja błędów**: Wymaga fizycznego dostępu (sprzęt do glitchingu)
+
+**Bezpieczeństwo wykonania:**
+- **Bez randomizacji adresów** (ograniczenie embedded)
+- **Bez bitu DEP/NX** (ograniczenie Cortex-M7)
+- **Weryfikacja bootloadera** (jeśli włączono): Gwarantuje tylko autoryzowany kod
+
+**Bezpieczeństwo IPC:**
+- **Przepełnienie kolejki**: Statycznie przydzielane (bez błędu przydziału)
+- **Deadlock mutex**: Dziedziczenie priorytetu FreeRTOS zapobiega
+- **Izolacja zadań**: Brak (wszystkie zadania dzielą przestrzeń adresową, przez projekt)
 
 ---
 

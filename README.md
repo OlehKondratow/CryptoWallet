@@ -721,25 +721,70 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200 --raw
 
 ---
 
-## 📋 Table of Contents
+## 📚 Module Reference
 
-### Core Systems
-1. **Memory Management** - FLASH/SRAM layout
-2. **Task Scheduling** - FreeRTOS multi-tasking
-3. **Interrupt Handling** - SysTick and peripherals
-4. **Boot Process** - Startup sequence
-5. **Authorization** - User confirmation & validation
+### Core Security & Signing
 
-### Cryptography
-6. **Signing Pipeline** - ECDSA workflow
-7. **Key Derivation** - BIP-39/32 HD wallet
-8. **Memory Security** - memzero() buffer clearing
-9. **Validation** - Address/amount verification
+| Module | Purpose | Location |
+|--------|---------|----------|
+| **main.c** | FreeRTOS entry point, IPC initialization, task creation | `Core/Src/main.c` |
+| **task_sign.c** | Signing FSM pipeline, transaction validation, ECDSA | `Core/Src/task_sign.c` |
+| **crypto_wallet.c** | trezor-crypto wrapper, key derivation, RNG | `Core/Src/crypto_wallet.c` |
+| **tx_request_validate.c** | Address/amount/currency validation gate | `Core/Src/tx_request_validate.c` |
+| **memzero.c** | Secure buffer clearing via volatile writes | `Core/Src/memzero.c` |
+| **sha256_minimal.c** | SHA-256 fallback (USE_CRYPTO_SIGN=0) | `Core/Src/sha256_minimal.c` |
+| **wallet_seed.c** | Seed management (test/development) | `Core/Src/wallet_seed.c` |
+| **task_security.c** | Legacy FSM with mock crypto (audit/test) | `Core/Src/task_security.c` |
 
-### Communication
-10. **HTTP Server** - LwIP/Ethernet
-11. **WebUSB** - USB vendor interface
-12. **UART** - Serial debug logging
+### Network & Communication
+
+| Module | Purpose | Location |
+|--------|---------|----------|
+| **task_net.c** | LwIP/Ethernet, HTTP server port 80 | `Src/task_net.c` |
+| **usb_webusb.c** | WebUSB vendor interface, binary protocol | `Core/Src/usb_webusb.c` |
+| **app_ethernet_cw.c** | Ethernet link FSM, DHCP state machine | `Src/app_ethernet_cw.c` |
+| **time_service.c** | SNTP synchronization, UTC strings | `Core/Src/time_service.c` |
+| **usb_device.c** | USB device initialization (HSI48) | `Core/Src/usb_device.c` |
+| **usbd_conf_cw.c** | USB BSP configuration, static allocator | `Core/Src/usbd_conf_cw.c` |
+| **usbd_desc_cw.c** | USB descriptors, WebUSB Platform UUID | `Core/Src/usbd_desc_cw.c` |
+
+### User Interface & I/O
+
+| Module | Purpose | Location |
+|--------|---------|----------|
+| **task_display.c** | SSD1306 UI (full), 4-line state rendering | `Core/Src/task_display.c` |
+| **task_display_minimal.c** | Minimal UI for minimal-lwip | `Core/Src/task_display_minimal.c` |
+| **task_user.c** | Button debounce (PC13), confirm/reject logic | `Core/Src/task_user.c` |
+| **task_io.c** | LED indicators (alive, network, alert) | `Core/Src/task_io.c` |
+
+### Hardware & System
+
+| Module | Purpose | Location |
+|--------|---------|----------|
+| **hw_init.c** | Clock, MPU/cache, GPIO, I2C1, UART, USB, RNG | `Core/Src/hw_init.c` |
+| **stm32h7xx_hal_msp.c** | MSP callbacks (I2C1, UART) | `Core/Src/stm32h7xx_hal_msp.c` |
+| **stm32h7xx_it.c** | Interrupt handlers (SysTick, ETH) | `Core/Src/stm32h7xx_it.c` |
+| **stm32h7xx_it_systick.c** | SysTick handler (minimal-lwip) | `Core/Src/stm32h7xx_it_systick.c` |
+| **stm32h7xx_it_usb.c** | USB OTG HS interrupt handler | `Core/Src/stm32h7xx_it_usb.c` |
+| **ssd1306_conf.h** | Display driver config (I2C1, 128×32) | `Drivers/ssd1306/ssd1306_conf.h` |
+
+### Shared Contracts
+
+| Header | Purpose | Location |
+|--------|---------|----------|
+| **wallet_shared.h** | IPC types, queues, events, display context | `Core/Inc/wallet_shared.h` |
+| **lwipopts.h** | LwIP compile-time config (heap, TCP, SNTP) | `Core/Inc/lwipopts.h` |
+| **main.h** | Board pins, LED defines, UART macro | `Core/Inc/main.h` |
+
+### Detailed Documentation
+
+Each module has comprehensive documentation in `docs_src/`:
+- **Abstract** - Business logic overview
+- **Logic Flow** - Algorithm walkthrough
+- **Dependencies** - Interactions with other modules
+- **Relations** - System context
+
+Example: [`docs_src/task_sign.md`](docs_src/task_sign.md) explains the 9-state signing FSM in detail.
 
 ---
 
@@ -756,12 +801,12 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200 --raw
 
 ## 📖 Further Reading
 
-Start with the analysis documentation to understand the full project context:
+For additional depth and exploration:
 
 1. **Quick Start:** [`docs_src/analysis/QUICK_REFERENCE.md`](docs_src/analysis/QUICK_REFERENCE.md)
 2. **Architecture:** [`docs_src/analysis/ARCHITECTURE_DETAILED.md`](docs_src/analysis/ARCHITECTURE_DETAILED.md)
 3. **Comparison:** [`docs_src/analysis/PROJECTS_COMPARISON_AND_UPDATES.md`](docs_src/analysis/PROJECTS_COMPARISON_AND_UPDATES.md)
-4. **Entry Point:** [`docs_src/analysis/00_README_DOCUMENTATION.md`](docs_src/analysis/00_README_DOCUMENTATION.md)
+4. **Module Docs:** [`docs_src/README.md`](docs_src/README.md)
 
 **Choose your language:**
 - 🇬🇧 English (above)
