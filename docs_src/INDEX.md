@@ -40,6 +40,10 @@ See [crypto/README.md](crypto/README.md) for comprehensive cryptography document
 - **[QUICK_REFERENCE.md](analysis/QUICK_REFERENCE.md)** - Build commands, troubleshooting, tips
 - **[reference-code.md](reference-code.md)** - Auto-generated code reference
 
+## 🔧 Documentation System
+
+- **[documentation_autogeneration.md](documentation_autogeneration.md)** - Auto-generation scripts and Make targets
+
 ## 🔍 Technical Analysis
 
 - **[VISUAL_SUMMARY.md](analysis/VISUAL_SUMMARY.md)** - Architecture visualizations and diagrams
