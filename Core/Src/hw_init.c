@@ -10,6 +10,9 @@
 #if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
 #include "usb_device.h"
 #endif
+#if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
+#include "stm32h7xx_hal_rng.h"
+#endif
 #include <stddef.h>
 #if defined(USE_LWIP) && !SKIP_OLED
 #include "ssd1306.h"
@@ -17,6 +20,9 @@
 #endif
 
 I2C_HandleTypeDef hi2c1;
+#if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
+RNG_HandleTypeDef hrng;
+#endif
 
 static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
@@ -86,8 +92,7 @@ static void MX_USART3_Init(void);
 #if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
 extern void MX_USB_Device_Init(void);
 #endif
-#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
-extern RNG_HandleTypeDef hrng;
+#if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
 static void MX_RNG_Init(void);
 #endif
 
@@ -118,12 +123,12 @@ void HW_Init(void)
     MX_USB_Device_Init();
     Task_Display_Log("USB ready");
 #endif
-#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
+#if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
     MX_RNG_Init();
 #endif
 }
 
-#if defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)
+#if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
 void HAL_RNG_MspInit(RNG_HandleTypeDef *rng_handle)
 {
     (void)rng_handle;

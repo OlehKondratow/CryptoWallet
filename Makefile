@@ -70,6 +70,12 @@ endif
 ifeq ($(USE_TEST_SEED),1)
 CFLAGS  += -DUSE_TEST_SEED=1
 endif
+# USE_RNG_DUMP=1: output raw RNG data on UART (for Dieharder testing)
+# WARNING: Disables normal UART output - only binary RNG data sent
+USE_RNG_DUMP ?= 0
+ifeq ($(USE_RNG_DUMP),1)
+CFLAGS  += -DUSE_RNG_DUMP=1 -DHAL_RNG_MODULE_ENABLED
+endif
 # USE_WEBUSB=1: USB device + WebUSB (PA11/PA12, CN13)
 USE_WEBUSB ?= 0
 ifeq ($(USE_WEBUSB),1)
@@ -134,6 +140,10 @@ OBJ += $(BUILD)/ethernetif.o $(BUILD)/app_ethernet_cw.o $(BUILD)/cmsis_os2.o $(B
        $(BUILD)/lwip_tcp.o $(BUILD)/lwip_tcp_in.o $(BUILD)/lwip_tcp_out.o $(BUILD)/lwip_udp.o $(BUILD)/lwip_netif.o \
        $(BUILD)/lwip_timeouts.o $(BUILD)/lwip_ip4.o $(BUILD)/lwip_icmp.o $(BUILD)/lwip_etharp.o $(BUILD)/lwip_dhcp.o $(BUILD)/lwip_acd.o $(BUILD)/lwip_ip4_addr.o \
        $(BUILD)/lwip_ip4_frag.o $(BUILD)/lwip_ethernet.o $(BUILD)/lwip_slip.o $(BUILD)/lwip_sntp.o
+endif
+
+ifeq ($(USE_RNG_DUMP),1)
+OBJ += $(BUILD)/rng_dump.o $(BUILD)/hal_rng.o
 endif
 
 .PHONY: all clean flash docs docs-md docs-code-md docs-doxygen docs-serve minimal-lwip flash-minimal-lwip boottest flash-boottest secure-signing-test
@@ -218,6 +228,10 @@ OBJ_MINIMAL_LWIP = $(BUILD)/main.o $(BUILD)/hw_init.o $(BUILD)/memzero.o $(BUILD
       $(BUILD)/lwip_ip4_frag.o $(BUILD)/lwip_ethernet.o $(BUILD)/lwip_slip.o $(BUILD)/lwip_sntp.o \
       $(BUILD)/ssd1306.o $(BUILD)/ssd1306_fonts.o
 
+ifeq ($(USE_RNG_DUMP),1)
+OBJ_MINIMAL_LWIP += $(BUILD)/rng_dump.o $(BUILD)/hal_rng.o
+endif
+
 USB_CUBE   := $(abspath $(TOP)/../STM32CubeH7)
 USB_MW     := $(USB_CUBE)/Middlewares/ST/STM32_USB_Device_Library
 WEBUSB_OBJ := $(BUILD)/usbd_conf_cw.o $(BUILD)/usbd_desc_cw.o $(BUILD)/usb_device.o \
@@ -293,6 +307,8 @@ $(BUILD)/stm32h7xx_hal_timebase_tim.o: $(LWIP_APP)/Src/stm32h7xx_hal_timebase_ti
 $(BUILD)/task_display.o: $(TOP)/Core/Src/task_display.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/task_security.o: $(TOP)/Core/Src/task_security.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/rng_dump.o: $(TOP)/Core/Src/rng_dump.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/task_net.o: $(TOP)/Src/task_net.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
@@ -414,6 +430,9 @@ $(BUILD)/hal_pwr.o: $(HAL_SRC)/stm32h7xx_hal_pwr.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 ifeq ($(USE_CRYPTO_SIGN),1)
 $(BUILD)/hal_rng.o: $(HAL_SRC)/stm32h7xx_hal_rng.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+else ifeq ($(USE_RNG_DUMP),1)
+$(BUILD)/hal_rng.o: $(CUBE_ROOT)/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_rng.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 endif
 $(BUILD)/hal_tim.o: $(HAL_SRC)/stm32h7xx_hal_tim.c | $(BUILD)
@@ -569,3 +588,10 @@ clean:
 	@mv "$(FREERTOS)/include/FreeRTOSConfig.h.bak" "$(FREERTOS)/include/FreeRTOSConfig.h" 2>/dev/null || true
 	@rm -f config-copied
 	rm -rf $(BUILD)
+
+# USE_RNG_DUMP=1: output raw RNG data on UART (for Dieharder testing)
+# WARNING: Disables normal UART output - only binary RNG data sent
+USE_RNG_DUMP ?= 0
+ifeq ($(USE_RNG_DUMP),1)
+CFLAGS += -DUSE_RNG_DUMP
+endif

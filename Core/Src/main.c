@@ -41,6 +41,9 @@
 #ifdef USE_CRYPTO_SIGN
 #include "crypto_wallet.h"
 #endif
+#ifdef USE_RNG_DUMP
+#include "rng_dump.h"
+#endif
 #ifndef SKIP_OLED
 #define SKIP_OLED 0
 #endif
@@ -159,6 +162,9 @@ int main(void)
     Task_Sign_Create();
     Task_IO_Create();
     Task_User_Create();
+#ifdef USE_RNG_DUMP
+    RNG_Dump_Task_Create();
+#endif
     Task_Display_Log("main: tasks created, starting scheduler");
 
 #if !SKIP_OLED

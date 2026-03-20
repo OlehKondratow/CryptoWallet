@@ -39,6 +39,13 @@ extern "C" {
  */
 int crypto_rng_init(void);
 
+/**
+ * @brief   Generate 32-bit random value
+ * @details Uses mixed TRNG and entropy pool.
+ * @return  Random 32-bit value
+ */
+uint32_t random32(void);
+
 /*-----------------------------------------------------------------------------
  * BIP-39 (Mnemonic)
  *-----------------------------------------------------------------------------*/

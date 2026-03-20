@@ -1,0 +1,41 @@
+# Контрольный Список Теста RNG (Русский)
+
+## Проблема
+Ошибка: 'device reports readiness but returned no data'
+Причина: Прошивка не имеет USE_RNG_DUMP=1
+
+## Решение (7 Шагов)
+
+1. **Прочитайте Руководство** (10 мин)
+   cat ENABLE_RNG_DUMP.md
+
+2. **Отредактируйте Makefile** (5 мин)
+   Добавьте USE_RNG_DUMP после USE_TEST_SEED
+   Добавьте CFLAGS += -DUSE_RNG_DUMP
+
+3. **Пересоберите Прошивку** (2 мин)
+   make clean
+   make USE_RNG_DUMP=1 -j$(nproc)
+
+4. **Загрузите на Устройство** (1 мин)
+   make flash
+
+5. **Проверьте** (1 мин)
+   python3 -m serial.tools.miniterm /dev/ttyACM0 115200 --raw
+
+6. **Запустите Тест** (15 мин)
+   source .venv-test/bin/activate
+   python3 scripts/test_rng_signing_comprehensive.py --mode rng
+
+7. **Проверьте Результаты** (1 мин)
+   ls -lh rng.bin rng_analysis.txt
+
+## Ожидаемые Результаты
+- rng.bin ~128 МБ
+- rng_analysis.txt со статистикой
+- Тест пройден успешно
+
+## Общее Время: 30-40 минут
+
+## Проблемы?
+→ rng_capture_troubleshooting_ru.md

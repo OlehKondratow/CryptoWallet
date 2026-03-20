@@ -1,0 +1,22 @@
+# Python dependencies for CryptoWallet testing
+# Generated: 2026-03-20
+#
+# Installation:
+#   python3 -m venv .venv-test
+#   .venv-test/bin/pip install -r requirements-test.txt
+#
+# Or with pinned versions:
+#   .venv-test/bin/pip install -r requirements-test-lock.txt
+
+# Core testing libraries (required)
+pyserial>=3.5,<4          # UART communication with device
+requests>=2.32,<3         # HTTP client for device communication
+
+# Terminal output formatting (optional but recommended)
+colorama>=0.4,<1          # Colored terminal output
+
+# For development (optional)
+black>=24.0,<25           # Code formatter
+flake8>=7.0,<8            # Linter
+pytest>=7.0,<8            # Unit testing framework
+

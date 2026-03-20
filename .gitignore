@@ -31,13 +31,18 @@ build/
 *.gch
 *.pch
 
-# Python / MkDocs
+# Python / MkDocs / Virtual Environments
 .venv-docs/
 .venv-scripts/
+.venv-test/
 .venv/
 __pycache__/
 *.py[cod]
+*.pyc
+*.pyo
+*.pyd
 .Python
+.pytest_cache/
 *.egg-info/
 .eggs/
 docs/
@@ -45,7 +50,8 @@ docs_doxygen/
 
 # IDE / editor
 .idea/
-.vscode/
+.vscode/settings.json
+.vscode/launch.json
 *.swp
 *.swo
 *~
@@ -57,3 +63,23 @@ Thumbs.db
 # Temporary / local
 config-copied
 *.bak
+
+# Testing / RNG outputs
+rng.bin
+rng_*.bin
+dieharder_results*.txt
+full_test*.log
+full_test*.txt
+test_results_*/
+cryptowallet_test_*.tar.gz
+cryptowallet_test_report.md
+
+# Requirements / package locks
+*.lock
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Coverage reports
+.coverage
+htmlcov/
+.tox/

@@ -1,0 +1,78 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║                    PYTHON VENV QUICKSTART                            ║
+║                                                                      ║
+║        Virtual Environment for CryptoWallet Testing                 ║
+║                                                                      ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+📍 LOCATION: /data/projects/CryptoWallet/.venv-test
+
+🚀 QUICK START (3 WAYS):
+
+  Way 1: Direct activation
+  ─────────────────────────
+    source .venv-test/bin/activate
+    python3 scripts/test_rng_signing_comprehensive.py --mode rng
+
+  Way 2: Using helper script
+  ──────────────────────────
+    bash activate-tests.sh
+    python3 scripts/test_rng_signing_comprehensive.py --mode rng
+
+  Way 3: Cursor IDE (Press F5)
+  ────────────────────────────
+    Ctrl+Shift+P → Python: Select Interpreter
+    Choose: ./.venv-test/bin/python3
+    Press F5 → Select test mode
+
+⚙️  FIRST TIME SETUP:
+
+  Before running tests, install system dependencies:
+  
+    bash install-test-deps.sh
+  
+  Or manually for your OS:
+    Linux:   sudo apt install dieharder
+    macOS:   brew install dieharder
+    Fedora:  sudo dnf install dieharder
+
+📦 PACKAGES INSTALLED:
+
+    ✓ pyserial 3.5        - UART communication
+    ✓ requests 2.32.5     - HTTP client
+    ✓ pip 26.0.1          - Package manager
+    ✓ setuptools 82.0.1   - Build utilities
+    ✓ wheel 0.46.3        - Distribution
+
+🎯 AVAILABLE TESTS:
+
+    RNG Test (30 min):
+    $ python3 scripts/test_rng_signing_comprehensive.py --mode rng
+
+    DIEHARDER (1-3 hours):
+    $ python3 scripts/test_rng_signing_comprehensive.py --mode dieharder
+
+    Signing Test (10 min):
+    $ python3 scripts/test_rng_signing_comprehensive.py --mode signing --ip 192.168.0.10
+
+    All Tests (3-5 hours):
+    $ python3 scripts/test_rng_signing_comprehensive.py --mode verify-all
+
+📖 DOCUMENTATION:
+
+    Installation:   docs_src/INSTALL_TEST_DEPS.md
+    Setup guide:    docs_src/VENV_SETUP.md
+    Test guide:     docs_src/TESTING_GUIDE_RNG_SIGNING.md
+
+✅ VERIFY INSTALLATION:
+
+    .venv-test/bin/python3 --version
+    .venv-test/bin/python3 -c "import serial, requests; print('OK')"
+
+═══════════════════════════════════════════════════════════════════════
+
+Status: ✅ READY
+Python: 3.12.7
+Date: 2026-03-20
+
+═══════════════════════════════════════════════════════════════════════
