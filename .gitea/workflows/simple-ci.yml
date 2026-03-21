@@ -21,6 +21,11 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Явно bash для всех шагов `run:` (как в интерактивной shell).
+defaults:
+  run:
+    shell: bash
+
 jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   # 1️⃣ BUILD - Compile firmware
