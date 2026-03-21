@@ -1,0 +1,266 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build-firmware",
+      "type": "shell",
+      "command": "make",
+      "args": [
+        "clean",
+        "USE_RNG_DUMP=${config:cryptoWallet.enableRngDump}"
+      ],
+      "problemMatcher": {
+        "owner": "arm-gcc",
+        "fileLocation": ["relative", "${workspaceRoot}"],
+        "pattern": {
+          "regexp": "^(.*):(\\d+):(\\d+):\\s+(warning|error):\\s+(.*)$",
+          "file": 1,
+          "location": 2,
+          "message": 5
+        }
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared",
+        "showReuseMessage": true,
+        "clear": true
+      }
+    },
+    {
+      "label": "build-firmware-rng",
+      "type": "shell",
+      "command": "make",
+      "args": [
+        "clean",
+        "USE_RNG_DUMP=1"
+      ],
+      "problemMatcher": "arm-gcc",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "flash-firmware",
+      "type": "shell",
+      "command": "st-flash",
+      "args": [
+        "write",
+        "build/cryptowallet.bin",
+        "0x08000000"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "flash-firmware-openocd",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "openocd -f .vscode/openocd_stm32h743.cfg -c 'program build/cryptowallet.elf verify reset exit'"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "run-rng-test",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "scripts/test_rng_signing_comprehensive.py",
+        "--mode",
+        "rng"
+      ],
+      "cwd": "${workspaceRoot}",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "run-signing-test",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "scripts/test_rng_signing_comprehensive.py",
+        "--mode",
+        "signing"
+      ],
+      "cwd": "${workspaceRoot}",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "openocd-server",
+      "type": "shell",
+      "isBackground": true,
+      "command": "openocd",
+      "args": [
+        "-f",
+        ".vscode/openocd_stm32h743.cfg"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      },
+      "problemMatcher": {
+        "pattern": {
+          "regexp": "^.*$"
+        },
+        "background": {
+          "activeOnStart": true,
+          "beginsPattern": "^.*Open On-Chip Debugger.*",
+          "endsPattern": "^.*Listening on port.*"
+        }
+      }
+    },
+    {
+      "label": "miniterm-rng",
+      "type": "shell",
+      "command": "python3",
+      "args": [
+        "-m",
+        "serial.tools.miniterm",
+        "/dev/ttyACM0",
+        "115200",
+        "--raw"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "new"
+      }
+    },
+    {
+      "label": "dieharder-analysis",
+      "type": "shell",
+      "command": "dieharder",
+      "args": [
+        "-f",
+        "rng.bin",
+        "-a"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "new"
+      }
+    },
+    {
+      "label": "static-analysis-cppcheck",
+      "type": "shell",
+      "command": "cppcheck",
+      "args": [
+        "--addon=cert",
+        "--enable=all",
+        "--error-exitcode=1",
+        "--std=c11",
+        "--suppress=missingIncludeSystem",
+        "Core/"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "static-analysis-clang-tidy",
+      "type": "shell",
+      "command": "bash",
+      "args": [
+        "-c",
+        "find Core/ -name '*.c' | xargs clang-tidy -checks='readability-*,bugprone-*,performance-*'"
+      ],
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": true,
+        "panel": "shared"
+      }
+    },
+  {
+    "label": "docker-build-runner",
+    "type": "shell",
+    "command": "podman",
+    "args": [
+      "build",
+      "-t",
+      "cryptowallet-runner:latest",
+      "-f",
+      "infra/Dockerfile.runner",
+      "."
+    ],
+    "presentation": {
+      "echo": true,
+      "reveal": "always",
+      "focus": true,
+      "panel": "shared"
+    }
+  },
+  {
+    "label": "podman-compose-up",
+    "type": "shell",
+    "command": "podman-compose",
+    "args": [
+      "-f",
+      "infra/docker-compose.yml",
+      "up",
+      "-d"
+    ],
+    "cwd": "${workspaceRoot}",
+    "presentation": {
+      "echo": true,
+      "reveal": "always",
+      "focus": true,
+      "panel": "shared"
+    }
+  },
+  {
+    "label": "podman-compose-down",
+    "type": "shell",
+    "command": "podman-compose",
+    "args": [
+      "-f",
+      "infra/docker-compose.yml",
+      "down"
+    ],
+    "cwd": "${workspaceRoot}",
+    "presentation": {
+      "echo": true,
+      "reveal": "always",
+      "focus": true,
+      "panel": "shared"
+    }
+  }
+  ]
+}

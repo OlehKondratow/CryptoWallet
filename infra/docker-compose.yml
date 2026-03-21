@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Gitea Git Service
+  gitea:
+    image: docker.io/gitea/gitea:latest
+    container_name: cryptowallet-gitea
+    restart: unless-stopped
+    networks:
+      - dev-network
+    volumes:
+      - gitea_data:/data
+      - /data/gitea/repo:/data/git/repositories
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "3000:3000"   # Web UI
+      - "2222:22"     # SSH Git access
+    environment:
+      - DB_TYPE=sqlite3
+      - DB_PATH=/data/gitea/gitea.db
+      - GITEA__DATABASE__LOG_SQL=false
+      - GITEA__SECURITY__INSTALL_LOCK=true
+      - GITEA__SERVICE__DISABLE_REGISTRATION=false
+      - GITEA__RUN_MODE=prod
+      - GITEA__ROOT_URL=http://localhost:3000/
+      - ROOT_URL=http://localhost:3000/
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/version"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  # Act Runner for CI/CD
+  gitea-runner:
+    image: docker.io/gitea/act_runner:nightly
+    container_name: cryptowallet-runner
+    restart: unless-stopped
+    networks:
+      - dev-network
+    depends_on:
+      gitea:
+        condition: service_healthy
+    environment:
+      - GITEA_INSTANCE_URL=http://gitea:3000
+      - GITEA_RUNNER_REGISTRATION_TOKEN=${GITEA_RUNNER_TOKEN:-}
+      - RUNNER_NAME=crypto-wallet-hil-runner
+      - RUNNER_LABELS=linux/amd64,crypto,hil
+      - RUNNER_CAPACITY=1
+      - LOG_LEVEL=info
+    volumes:
+      # Docker socket for building images
+      - /var/run/docker.sock:/var/run/docker.sock:rw
+      # Dev filesystem for hardware access
+      - /dev:/dev:rw
+      - /dev/bus/usb:/dev/bus/usb:rw
+      # Explicit serial device mappings
+      - /dev/ttyACM0:/dev/ttyACM0:rw
+      - /dev/ttyACM1:/dev/ttyACM1:rw
+      - /dev/ttyUSB0:/dev/ttyUSB0:rw
+      - /dev/ttyUSB1:/dev/ttyUSB1:rw
+      # Workspace for builds
+      - runner_work:/workspace
+      # Cache volumes
+      - runner_cache:/cache
+    security_opt:
+      - apparmor=unconfined
+    cap_add:
+      - SYS_ADMIN
+      - NET_ADMIN
+      - SYS_PTRACE
+    privileged: true
+    devices:
+      # ST-LINK debugger
+      - /dev/bus/usb:/dev/bus/usb:rw
+    healthcheck:
+      test: ["CMD", "pgrep", "-f", "act"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: PostgreSQL for Gitea (more reliable than SQLite)
+  # Uncomment to use PostgreSQL instead of SQLite
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: cryptowallet-postgres
+  #   restart: unless-stopped
+  #   networks:
+  #     - dev-network
+  #   environment:
+  #     - POSTGRES_DB=gitea
+  #     - POSTGRES_USER=gitea
+  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_change_me}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U gitea"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+networks:
+  dev-network:
+    driver: bridge
+
+volumes:
+  gitea_data:
+    driver: local
+  runner_work:
+    driver: local
+  runner_cache:
+    driver: local
+  # postgres_data:
+  #   driver: local

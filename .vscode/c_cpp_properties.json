@@ -1,0 +1,43 @@
+{
+  "env": {
+    "ARM_GCC_PATH": "/usr/bin/arm-none-eabi",
+    "STLINK_PATH": "/usr/bin",
+    "OPENOCD_PATH": "/usr/bin"
+  },
+  "configurations": [
+    {
+      "name": "Linux-ARM-STM32",
+      "includePath": [
+        "${workspaceRoot}/**",
+        "${workspaceRoot}/Core/Inc/**",
+        "${workspaceRoot}/Drivers/**",
+        "${workspaceRoot}/ThirdParty/**",
+        "/usr/arm-none-eabi/include",
+        "/usr/lib/gcc/arm-none-eabi/13.2.1/include",
+        "/usr/arm-none-eabi/include/c++/13.2.1"
+      ],
+      "defines": [
+        "STM32H743xx",
+        "STM32H7",
+        "ARM_MATH_CM7",
+        "USE_CRYPTO_SIGN=1",
+        "USE_RNG_DUMP=0",
+        "_GNU_SOURCE",
+        "__GNUC__"
+      ],
+      "compilerPath": "/usr/bin/arm-none-eabi-gcc",
+      "cStandard": "c11",
+      "cppStandard": "c++17",
+      "intelliSenseMode": "gcc-arm",
+      "browse": {
+        "path": [
+          "${workspaceRoot}",
+          "/usr/arm-none-eabi/include"
+        ],
+        "limitSymbolsToIncludedHeaders": false,
+        "databaseFilename": "${workspaceRoot}/.vscode/.browse.VC.db"
+      }
+    }
+  ],
+  "version": 4
+}

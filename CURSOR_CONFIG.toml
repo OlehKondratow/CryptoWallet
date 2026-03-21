@@ -1,0 +1,27 @@
+# Settings for Cursor IDE - Agent Transcripts Storage
+
+[agent]
+# Store transcripts in project (not in ~/.cursor)
+transcriptStorage = "project"
+transcriptPath = "agent-transcripts"
+autoSave = true
+saveInterval = 5000
+
+[storage]
+# Ensure transcripts are kept locally in project
+localOnly = true
+gitInclude = true
+
+[project]
+name = "CryptoWallet"
+type = "embedded-firmware"
+language = "c"
+
+# Keep agent transcripts in project
+includePatterns = [
+    "agent-transcripts/**/*.jsonl",
+    ".cursor/agent-transcripts/**"
+]
+
+# Don't ignore transcripts
+ignorePatterns = []

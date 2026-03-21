@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    "ms-vscode.cpptools",
+    "ms-vscode.cpptools-extension-pack",
+    "marus25.cortex-debug",
+    "ms-vscode.makefile-tools",
+    "ms-python.python",
+    "ms-python.debugpy",
+    "GitHub.copilot",
+    "eamodio.gitlens",
+    "ms-vscode.hexdump",
+    "DavidAnson.vscode-markdownlint",
+    "redhat.vscode-yaml",
+    "esbenp.prettier-vscode",
+    "ms-azuretools.vscode-docker",
+    "jebbs.plantuml"
+  ]
+}

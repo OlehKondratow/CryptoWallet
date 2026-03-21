@@ -83,3 +83,14 @@ pip-delete-this-directory.txt
 .coverage
 htmlcov/
 .tox/
+
+# Infrastructure
+infra/gitea-data/
+infra/gitea-config/
+infra/act-runner-data/
+infra/.env.local
+docker-compose.override.yml
+
+# Agent transcripts (keep in project)
+!agent-transcripts/
+!agent-transcripts/**

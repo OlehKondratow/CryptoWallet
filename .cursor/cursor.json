@@ -1,0 +1,25 @@
+{
+  "agent": {
+    "transcriptStorage": "project",
+    "transcriptPath": "agent-transcripts",
+    "autoSave": true,
+    "saveInterval": 5000
+  },
+  "project": {
+    "name": "CryptoWallet",
+    "description": "Secure Crypto Wallet firmware for STM32H743ZI2",
+    "language": "C",
+    "framework": "FreeRTOS + LwIP"
+  },
+  "development": {
+    "targetDevice": "STM32H743ZI2",
+    "build": {
+      "system": "Make",
+      "command": "make USE_RNG_DUMP=1"
+    },
+    "debug": {
+      "debugger": "GDB",
+      "interface": "OpenOCD"
+    }
+  }
+}
