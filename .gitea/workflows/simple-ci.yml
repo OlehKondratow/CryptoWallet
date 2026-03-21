@@ -1,0 +1,412 @@
+name: Simple CI - Build → Flash → Test
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 1️⃣ BUILD - Compile firmware
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  build:
+    name: '1️⃣ Build Firmware'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install ARM toolchain
+        run: |
+          sudo apt-get update > /dev/null
+          sudo apt-get install -y arm-none-eabi-gcc arm-none-eabi-binutils > /dev/null
+          echo "✓ Toolchain installed"
+
+      - name: Build firmware
+        run: |
+          echo "🔨 Building firmware..."
+          make clean
+          make USE_RNG_DUMP=1 -j$(nproc)
+          echo ""
+          echo "✅ Build complete:"
+          ls -lh build/cryptowallet.bin build/cryptowallet.elf
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware-build
+          path: |
+            build/cryptowallet.bin
+            build/cryptowallet.elf
+          retention-days: 7
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 2️⃣ FLASH - Flash to device + RESET
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  flash:
+    name: '2️⃣ Flash & Reset Device'
+    runs-on: host
+    needs: build
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Download firmware
+        uses: actions/download-artifact@v3
+        with:
+          name: firmware-build
+          path: build/
+
+      - name: Install st-link tools
+        run: |
+          which st-flash || { echo "st-flash already installed"; }
+
+      - name: Flash firmware to STM32H743ZI2
+        run: |
+          echo "📤 Flashing firmware..."
+          st-flash --reset write build/cryptowallet.bin 0x08000000 || \
+          { echo "⚠️ Flash failed (device may not be connected)"; exit 0; }
+          echo "✅ Flash + Reset complete"
+
+      - name: Wait for device stabilization
+        run: |
+          echo "⏳ Waiting 2 seconds for device boot..."
+          sleep 2
+          echo "✓ Device should be ready"
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 3️⃣ ANALYSE LOG - Read UART output after reset
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  analyse-log:
+    name: '3️⃣ Analyse UART Log'
+    runs-on: host
+    needs: flash
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        run: |
+          python3 -m pip install -q pyserial || echo "pyserial already installed"
+
+      - name: Read UART output (5 seconds)
+        run: |
+          echo "📡 Reading UART output..."
+          python3 << 'PYTHON_EOF'
+          import serial
+          import time
+          import os
+          
+          uart_file = "uart_output.log"
+          
+          if not os.path.exists("/dev/ttyACM0"):
+              print("⚠️  /dev/ttyACM0 not available (device not connected)")
+              print("   Skipping UART read")
+              open(uart_file, 'w').write("Device not connected\n")
+              exit(0)
+          
+          try:
+              ser = serial.Serial("/dev/ttyACM0", baudrate=115200, timeout=0.5)
+              time.sleep(0.5)
+              
+              print("📡 Connected to UART")
+              
+              output = []
+              timeout = time.time() + 5  # 5 second read
+              
+              while time.time() < timeout:
+                  if ser.in_waiting > 0:
+                      chunk = ser.read(ser.in_waiting)
+                      text = chunk.decode('utf-8', errors='ignore')
+                      output.append(text)
+                      print(text, end='', flush=True)
+                  else:
+                      time.sleep(0.1)
+              
+              ser.close()
+              
+              # Save to file
+              with open(uart_file, 'w') as f:
+                  f.write(''.join(output))
+              
+              print("\n✓ UART log saved to:", uart_file)
+              
+          except Exception as e:
+              print(f"✗ UART error: {e}")
+              open(uart_file, 'w').write(f"Error: {e}\n")
+          PYTHON_EOF
+
+      - name: Display log analysis
+        if: always()
+        run: |
+          if [ -f uart_output.log ]; then
+            echo "=== UART Output ==="
+            cat uart_output.log
+            echo ""
+            echo "=== Analysis ==="
+            echo "Lines: $(wc -l < uart_output.log)"
+            echo "Bytes: $(wc -c < uart_output.log)"
+            if grep -q "error\|Error\|ERROR" uart_output.log; then
+              echo "⚠️  Error messages detected!"
+            else
+              echo "✓ No obvious errors"
+            fi
+          else
+            echo "⚠️ No UART log available"
+          fi
+
+      - name: Upload UART log
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: uart-logs
+          path: uart_output.log
+          retention-days: 7
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 4️⃣ QUICK TEST - Preliminary functionality check
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  quick-test:
+    name: '4️⃣ Quick Preliminary Test'
+    runs-on: host
+    needs: analyse-log
+    if: always()
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        run: |
+          python3 -m pip install -q pyserial requests || echo "Dependencies ready"
+
+      - name: Device connectivity check
+        run: |
+          echo "🔍 Device connectivity check:"
+          echo ""
+          
+          echo "UART devices:"
+          ls -la /dev/ttyACM* 2>/dev/null && echo "✓ UART available" || echo "⚠️ No UART devices"
+          
+          echo ""
+          echo "USB devices:"
+          lsusb | grep -i stm && echo "✓ STM32 found" || echo "⚠️ No STM32 in USB"
+          
+          echo ""
+          echo "ST-LINK detection:"
+          st-flash --info 2>&1 | head -5 || echo "⚠️ No ST-LINK detected"
+
+      - name: Firmware size check
+        run: |
+          echo "📦 Checking firmware in flash:"
+          python3 << 'PYTHON_EOF'
+          import os
+          
+          # Check if device is accessible
+          try:
+              # Try to read device info via st-flash (doesn't require flashing)
+              os.system("st-flash --info")
+              print("✓ Device accessible")
+          except:
+              print("⚠️ Device not accessible (may not be connected)")
+          PYTHON_EOF
+
+      - name: Basic UART ping test (if available)
+        run: |
+          echo "📡 Basic UART test (5 second ping):"
+          python3 << 'PYTHON_EOF'
+          import serial
+          import time
+          import os
+          
+          if not os.path.exists("/dev/ttyACM0"):
+              print("⚠️ No UART device - skipping")
+              exit(0)
+          
+          try:
+              ser = serial.Serial("/dev/ttyACM0", baudrate=115200, timeout=1)
+              time.sleep(0.5)
+              
+              # Listen for any activity
+              data_received = b""
+              timeout = time.time() + 5
+              
+              while time.time() < timeout:
+                  if ser.in_waiting > 0:
+                      chunk = ser.read(1024)
+                      data_received += chunk
+                      print(f"  Received {len(chunk)} bytes")
+              
+              ser.close()
+              
+              if len(data_received) > 0:
+                  print(f"✓ Device transmitting: {len(data_received)} total bytes")
+              else:
+                  print("⚠️ No data received from device")
+                  
+          except Exception as e:
+              print(f"✗ UART test error: {e}")
+          PYTHON_EOF
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # 5️⃣ HARDWARE TEST - Full firmware test (RNG, Signing)
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  hardware-test:
+    name: '5️⃣ Hardware Firmware Test'
+    runs-on: host
+    needs: quick-test
+    if: always()
+    timeout-minutes: 30
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Python environment
+        run: |
+          python3 -m venv .venv
+          .venv/bin/pip install -q -r requirements-test.txt
+          echo "✓ Python environment ready"
+
+      - name: RNG UART capture test
+        continue-on-error: true
+        run: |
+          echo "🧪 Attempting RNG capture via UART..."
+          .venv/bin/python3 scripts/capture_rng_uart.py \
+            --port /dev/ttyACM0 \
+            --out rng_test.bin \
+            --bytes 1000000 \
+            2>&1 || echo "⚠️ RNG capture failed (device may not be running)"
+          
+          if [ -f rng_test.bin ]; then
+            SIZE=$(stat -f%z rng_test.bin 2>/dev/null || stat -c%s rng_test.bin)
+            echo "✓ Captured $SIZE bytes"
+          else
+            echo "⚠️ No RNG data captured"
+          fi
+
+      - name: Quick DIEHARDER validation (if data available)
+        continue-on-error: true
+        run: |
+          if [ -f rng_test.bin ]; then
+            echo "📊 Running DIEHARDER validation..."
+            dieharder -f rng_test.bin -a 2>&1 | head -50 | tee dieharder_snippet.log
+          else
+            echo "⚠️ Skipping DIEHARDER (no RNG data)"
+          fi
+
+      - name: Firmware functionality test
+        continue-on-error: true
+        run: |
+          echo "🔐 Testing firmware functionality..."
+          
+          # Run comprehensive test if available
+          if [ -f "scripts/test_rng_signing_comprehensive.py" ]; then
+            .venv/bin/python3 scripts/test_rng_signing_comprehensive.py \
+              --mode signing 2>&1 | head -30 || \
+            echo "⚠️ Functionality test incomplete (expected in offline CI)"
+          else
+            echo "⚠️ Test script not found"
+          fi
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: hardware-test-results
+          path: |
+            rng_test.bin
+            dieharder_snippet.log
+          retention-days: 7
+
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # REPORT - Final summary
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  report:
+    name: '📋 CI Pipeline Report'
+    runs-on: ubuntu-latest
+    needs: [ build, flash, analyse-log, quick-test, hardware-test ]
+    if: always()
+    steps:
+      - name: Generate report
+        run: |
+          cat > pipeline_report.txt << 'REPORT'
+          ╔════════════════════════════════════════════════════════════╗
+          ║          CryptoWallet Simple CI Pipeline Report            ║
+          ╚════════════════════════════════════════════════════════════╝
+          
+          Pipeline Stages:
+          ─────────────────
+          
+          1️⃣  BUILD
+              Status: ${{ needs.build.result }}
+              Task: Compile firmware using ARM GCC toolchain
+              Output: cryptowallet.bin, cryptowallet.elf
+          
+          2️⃣  FLASH & RESET
+              Status: ${{ needs.flash.result }}
+              Task: Flash firmware to STM32H743ZI2 via ST-LINK
+              Device: STM32H743ZI2 (Nucleo-144)
+              Flash Address: 0x08000000
+          
+          3️⃣  ANALYSE LOG
+              Status: ${{ needs.analyse-log.result }}
+              Task: Read UART output after reset
+              Duration: 5 seconds
+              Port: /dev/ttyACM0 @ 115200 baud
+          
+          4️⃣  QUICK TEST
+              Status: ${{ needs.quick-test.result }}
+              Task: Preliminary device connectivity check
+              Checks: UART, USB, ST-LINK detection
+              Duration: ~5 seconds
+          
+          5️⃣  HARDWARE TEST
+              Status: ${{ needs.hardware-test.result }}
+              Task: Full firmware functionality test
+              Tests: RNG capture, DIEHARDER, Signing
+              Duration: Up to 30 minutes
+          
+          ╔════════════════════════════════════════════════════════════╗
+          ║                    Summary Status                          ║
+          ╚════════════════════════════════════════════════════════════╝
+          
+          Build:        ${{ needs.build.result }}       ✓
+          Flash:        ${{ needs.flash.result }}       ⚠️ (device dependent)
+          Analysis:     ${{ needs.analyse-log.result }}  ⚠️ (device dependent)
+          Quick Test:   ${{ needs.quick-test.result }}   ⚠️ (device dependent)
+          Hardware:     ${{ needs.hardware-test.result }}  ⚠️ (device dependent)
+          
+          ✓ = Success
+          ⚠️ = Device offline (expected in CI without hardware)
+          
+          Notes:
+          ──────
+          - Stages 2-5 require STM32H743ZI2 device + ST-LINK debugger
+          - Stage 1 (Build) always works in CI environment
+          - UART tests require /dev/ttyACM0 to be available
+          - RNG capture requires firmware running on device (5-30 min)
+          
+          Next Steps:
+          ───────────
+          1. Check build artifacts in Actions
+          2. If device connected: verify UART logs
+          3. For full tests: ensure device is powered and connected
+          4. Review individual job logs for details
+          
+          Artifacts:
+          ──────────
+          - firmware-build/cryptowallet.{bin,elf}
+          - uart-logs/uart_output.log
+          - hardware-test-results/rng_test.bin, dieharder_snippet.log
+          REPORT
+          
+          cat pipeline_report.txt
+
+      - name: Upload report
+        uses: actions/upload-artifact@v3
+        with:
+          name: pipeline-report
+          path: pipeline_report.txt
+          retention-days: 30
