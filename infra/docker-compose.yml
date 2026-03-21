@@ -1,24 +1,36 @@
 version: '3.8'
 
+# Gitea с фиксированным IP в LAN: 192.168.127.4/23, шлюз 192.168.126.1
+# ---------------------------------------------------------------------------
+# Используется driver: macvlan — контейнер «сидит» в той же подсети, что и ПК.
+# Обязательно задайте интерфейс хоста, который смотрит в эту сеть:
+#   export GITEA_MACVLAN_PARENT=enp0s31f6
+#   podman-compose -f infra/docker-compose.yml up -d
+# (имя смотрите: ip -br addr  |  nmcli device status)
+#
+# Убедитесь, что 192.168.127.4 свободен. На rootless Podman macvlan может быть ограничен.
+#
+# Доступ: http://192.168.127.4:3000  |  git+ssh: ssh://git@192.168.127.4:22
+# Старый вариант с пробросом localhost:3000 при macvlan не используется — см. порт ниже.
+
 services:
-  # Gitea Git Service
   gitea:
     image: docker.io/gitea/gitea:latest
     container_name: cryptowallet-gitea
     restart: unless-stopped
     networks:
-      - dev-network
+      gitea_lan:
+        ipv4_address: 192.168.127.4
     volumes:
-      # Database and configs - persistent bind mount on host
       - /data/gitea/data:/data
-      # Git repositories - persistent bind mount on host
       - /data/gitea/repositories:/data/git/repositories
-      # Timezone
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-    ports:
-      - "3000:3000"   # Web UI
-      - "2222:22"     # SSH Git access
+    # При macvlan публикация портов на хост обычно не нужна — сервис слушает на IP контейнера.
+    # Раскомментируйте, если нужен доступ к Gitea ещё и через localhost на машине с Docker:
+    # ports:
+    #   - "3000:3000"
+    #   - "2222:22"
     environment:
       - DB_TYPE=sqlite3
       - DB_PATH=/data/gitea/gitea.db
@@ -26,10 +38,11 @@ services:
       - GITEA__SECURITY__INSTALL_LOCK=true
       - GITEA__SERVICE__DISABLE_REGISTRATION=false
       - GITEA__RUN_MODE=prod
-      - GITEA__SERVER__DOMAIN=localhost
-      - GITEA__SERVER__ROOT_URL=http://localhost:3000/
-      - GITEA__SERVER__SSH_PORT=2222
-      - ROOT_URL=http://localhost:3000/
+      - GITEA__SERVER__DOMAIN=192.168.127.4
+      - GITEA__SERVER__ROOT_URL=http://192.168.127.4:3000/
+      - GITEA__SERVER__SSH_PORT=22
+      - GITEA__SERVER__HTTP_PORT=3000
+      - ROOT_URL=http://192.168.127.4:3000/
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/version"]
       interval: 10s
@@ -37,34 +50,15 @@ services:
       retries: 5
       start_period: 30s
 
-  # NOTE: Act Runner is now installed on the host (~/gitea-runner)
-  # Run via systemd service: systemctl --user status gitea-runner
-  # This provides direct hardware access to UART, USB devices, and ST-LINK
-
-  # Optional: PostgreSQL for Gitea (more reliable than SQLite)
-  # Uncomment to use PostgreSQL instead of SQLite
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: cryptowallet-postgres
-  #   restart: unless-stopped
-  #   networks:
-  #     - dev-network
-  #   environment:
-  #     - POSTGRES_DB=gitea
-  #     - POSTGRES_USER=gitea
-  #     - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-secure_change_me}
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U gitea"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  # NOTE: Act Runner — на хосте (systemd), не в compose.
 
 networks:
-  dev-network:
-    driver: bridge
-
-volumes:
-  # postgres_data:
-  #   driver: local
+  gitea_lan:
+    driver: macvlan
+    driver_opts:
+      # Физический интерфейс с адресом в 192.168.126.0/23 (замените на свой)
+      parent: ${GITEA_MACVLAN_PARENT:-eth0}
+    ipam:
+      config:
+        - subnet: 192.168.126.0/23
+          gateway: 192.168.126.1
