@@ -230,7 +230,7 @@ cat ~/gitea-runner/config.yaml
 Name: host-runner-ws8
 Status: ACTIVE (systemd service)
 Version: v0.3.0
-Labels: ubuntu-latest, ubuntu-24.04, ubuntu-22.04
+Labels (host runner): `ubuntu-latest:host` — джобы без Docker job-контейнера (см. `simple-ci.yml`, не используйте `container: false`).
 Capacity: 1 job at a time
 Podman Socket: /run/user/1000/podman/podman.sock
 ```

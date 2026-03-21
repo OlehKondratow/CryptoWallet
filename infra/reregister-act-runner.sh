@@ -14,7 +14,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNNER_HOME="${RUNNER_HOME:-${HOME}/gitea-runner}"
 RUNNER_NAME="${RUNNER_NAME:-host-runner-$(hostname)}"
-GITEA_URL="${GITEA_URL:-http://192.168.127.5:3000}"
+GITEA_URL="${GITEA_URL:-http://127.0.0.1:3000}"
+# Метка `ubuntu-latest:host` — джобы выполняются на хосте без Docker job-контейнера
+# (нужно для checkout к Gitea и /dev/ttyACM*). Не путать с `container: false` в workflow.
+GITEA_RUNNER_LABELS="${GITEA_RUNNER_LABELS:-ubuntu-latest:host}"
 
 # Токен: GITEA_RUNNER_TOKEN или GITEA_TOKEN из окружения
 TOKEN="${GITEA_RUNNER_TOKEN:-${GITEA_TOKEN:-}}"
@@ -41,6 +44,7 @@ echo "════════════════════════�
 echo "  RUNNER_HOME: ${RUNNER_HOME}"
 echo "  GITEA_URL:   ${GITEA_URL}"
 echo "  RUNNER_NAME: ${RUNNER_NAME}"
+echo "  LABELS:      ${GITEA_RUNNER_LABELS}"
 echo ""
 
 echo "⏹  Останавливаю gitea-runner..."
@@ -59,6 +63,7 @@ if "${ACT_RUNNER}" register \
   --instance "${GITEA_URL}" \
   --token "${TOKEN}" \
   --name "${RUNNER_NAME}" \
+  --labels "${GITEA_RUNNER_LABELS}" \
   --no-interactive; then
   echo "✅ Регистрация успешна"
 else

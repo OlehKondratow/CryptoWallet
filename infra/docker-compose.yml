@@ -10,8 +10,19 @@ version: '3.8'
 #
 # Убедитесь, что 192.168.127.5 свободен. На rootless Podman macvlan может быть ограничен.
 #
-# Публичный URL (HTTPS): https://192.168.127.5/ — обычно за reverse proxy (443→3000).
-# Прямой HTTP к контейнеру: http://192.168.127.5:3000  |  git+ssh: ssh://git@192.168.127.5:22
+# Веб: Gitea слушает HTTP :3000; проброс ports → единственный стабильный URL с этого
+# хоста: http://127.0.0.1:3000/ (репо: …/admin/CryptoWallet). В infra/.env держите
+# GITEA_ROOT_URL=http://127.0.0.1:3000/ чтобы ссылки клонирования не уводили на LAN-IP.
+#
+# Доступ с ЭТОГО ЖЕ хоста по http://192.168.127.5:3000/ — у macvlan по умолчанию
+# не работает; поднимите shim:  sudo ./infra/macvlan-host-shim.sh add
+# затем в infra/.env: GITEA_ROOT_URL=http://192.168.127.5:3000/ и GITEA_SERVER_DOMAIN=192.168.127.5
+#
+# Без shim: используйте http://127.0.0.1:3000/ (GITEA_ROOT_URL по умолчанию в compose).
+#
+# HTTPS на 443 — только за reverse proxy. Репозиторий admin/CryptoWallet в UI:
+#   http://…:3000/admin/CryptoWallet  (пользователь admin, репо CryptoWallet)
+# Панель администрирования сайта: http://…:3000/admin
 
 services:
   gitea:
@@ -26,10 +37,11 @@ services:
       - /data/gitea/repositories:/data/git/repositories
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-    # При macvlan публикация портов на хост обычно не нужна — сервис слушает на IP контейнера.
-    # Раскомментируйте, если нужен доступ к Gitea ещё и через localhost на машине с Docker:
-    # ports:
-    #   - "3000:3000"
+    # Проброс на хост, чтобы с ЭТОЙ же машины открыть http://127.0.0.1:3000 (macvlan).
+    ports:
+      - "3000:3000"
+    # Опционально SSH clone с хоста: ssh://git@127.0.0.1:2222 — раскомментируйте и
+    # выставьте GITEA__SERVER__SSH_PORT=2222 в environment, если 22 занят на хосте.
     #   - "2222:22"
     environment:
       - DB_TYPE=sqlite3
@@ -38,12 +50,12 @@ services:
       - GITEA__SECURITY__INSTALL_LOCK=true
       - GITEA__SERVICE__DISABLE_REGISTRATION=false
       - GITEA__RUN_MODE=prod
-      - GITEA__SERVER__DOMAIN=192.168.127.5
-      # Внешний адрес для ссылок (HTTPS); контейнер слушает HTTP :3000 — TLS на прокси или в app.ini
-      - GITEA__SERVER__ROOT_URL=https://192.168.127.5/
+      # Домен в ссылках (SSH и т.д.); вместе с GITEA_ROOT_URL — из .env или значения по умолчанию
+      - GITEA__SERVER__DOMAIN=${GITEA_SERVER_DOMAIN:-127.0.0.1}
+      - GITEA__SERVER__ROOT_URL=${GITEA_ROOT_URL:-http://127.0.0.1:3000/}
       - GITEA__SERVER__SSH_PORT=22
       - GITEA__SERVER__HTTP_PORT=3000
-      - ROOT_URL=https://192.168.127.5/
+      - ROOT_URL=${GITEA_ROOT_URL:-http://127.0.0.1:3000/}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/version"]
       interval: 10s
@@ -53,10 +65,8 @@ services:
 
   # NOTE: Act Runner — на хосте (systemd/podman), не в compose.
   #
-  # После macvlan у Gitea только IP 192.168.127.5 — с хоста localhost:3000 к API может
-  # не ходить. В ~/gitea-runner/.runner поле "address" должно быть, например:
-  #   http://192.168.127.5:3000
-  # (или https://192.168.127.5 если API за TLS на 443). Затем:
+  # act_runner на ЭТОМ же хосте: в ~/gitea-runner/.runner "address" = тот же хост, что и
+  # GITEA_ROOT_URL (по умолчанию http://127.0.0.1:3000). Затем:
   #   systemctl --user restart gitea-runner
   # Новый registration token: ./infra/reregister-act-runner.sh (токен в infra/.env.local)
 

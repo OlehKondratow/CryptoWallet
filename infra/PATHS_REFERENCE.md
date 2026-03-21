@@ -4,7 +4,7 @@
 
 - Если **act_runner запущен от root** (в т.ч. «из каталога проекта»): домашний каталог
   — `/root/`, конфиг может лежать рядом с бинарником или в `/root/gitea-runner/`;
-  шаги с `container: false` выполняются **от root** на хосте.
+  джобы с меткой `ubuntu-latest:host` выполняются **от root** на хосте (без Docker job-контейнера).
 - Если runner от **обычного пользователя** (пример ниже с `pilgrim`): пути вида
   `/home/pilgrim/gitea-runner/`, для Podman — `DOCKER_HOST=unix:///run/user/UID/...`.
 

@@ -8,8 +8,8 @@ RUNNER_VERSION="v0.3.0"
 RUNNER_ARCH="linux_amd64"
 RUNNER_HOME="${HOME}/gitea-runner"
 RUNNER_NAME="host-runner-$(hostname)"
-# С Gitea на macvlan (см. infra/docker-compose.yml) API с хоста: http://192.168.127.5:3000
-GITEA_URL="${GITEA_URL:-http://192.168.127.5:3000}"
+# Тот же URL, что GITEA_ROOT_URL в compose (по умолчанию localhost с пробросом порта)
+GITEA_URL="${GITEA_URL:-http://127.0.0.1:3000}"
 GITEA_TOKEN="${GITEA_TOKEN:-}"
 
 echo "═══════════════════════════════════════════════════════"
@@ -94,9 +94,7 @@ runner:
   fetch_timeout: 5s
   fetch_interval: 2s
   labels:
-    - ubuntu-latest
-    - host
-    - x86_64
+    - ubuntu-latest:host
 
 cache:
   enabled: true
@@ -130,6 +128,7 @@ if [ -z "${GITEA_TOKEN}" ]; then
     echo "    --instance ${GITEA_URL} \\"
     echo "    --token \${GITEA_TOKEN} \\"
     echo "    --name ${RUNNER_NAME} \\"
+    echo "    --labels ubuntu-latest:host \\"
     echo "    --no-interactive"
     echo ""
     read -p "Enter token (or press Enter to skip): " TOKEN_INPUT
@@ -148,6 +147,7 @@ if ${RUNNER_HOME}/act_runner register \
     --instance "${GITEA_URL}" \
     --token "${GITEA_TOKEN}" \
     --name "${RUNNER_NAME}" \
+    --labels "ubuntu-latest:host" \
     --no-interactive; then
     echo "✅ Runner registered successfully!"
 else
