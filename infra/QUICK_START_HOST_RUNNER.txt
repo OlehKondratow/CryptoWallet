@@ -1,0 +1,77 @@
+# Host Runner - Quick Start
+
+## 🚀 30-Второе Начало
+
+### 1. Запустить скрипт установки
+
+```bash
+cd /data/projects/CryptoWallet/infra
+chmod +x setup-host-runner.sh
+./setup-host-runner.sh
+```
+
+Скрипт спросит token. **Где его взять:**
+
+1. Открыть: http://localhost:3000/admin/runners
+2. Нажать "Create new Runner" (синяя кнопка)
+3. Скопировать токен
+4. Вставить в скрипт
+
+### 2. Проверить статус
+
+```bash
+systemctl --user status gitea-runner
+```
+
+Должно быть: **Active (running)**
+
+### 3. Проверить в Gitea UI
+
+http://localhost:3000/admin/runners
+
+Должны видеть 2 раннера:
+- Container (ID 6) - ACTIVE ✅
+- Host runner - ACTIVE ✅ (новый)
+
+---
+
+## 🧹 Очистка Старых Раннеров
+
+В Gitea UI:
+1. **Admin → Runners Management**
+2. Для каждого OFFLINE раннера (ID 3, 4, 5):
+   - Нажать **Edit**
+   - Нажать **Delete**
+
+---
+
+## 🧪 Тестирование
+
+### Запустить debug workflow:
+
+```bash
+cd /data/projects/CryptoWallet
+git add .gitea/workflows/debug-runners.yml
+git commit -m "Add debug runners workflow"
+git push
+```
+
+Затем в Gitea:
+1. **Actions**
+2. **Debug Runners & System Info**
+3. **Run workflow**
+
+Результаты покажут обе раннеры в деле.
+
+---
+
+## 📊 Результат
+
+| Компонент | Статус |
+|-----------|--------|
+| Gitea | 🟢 Running |
+| Container Runner | 🟢 Active |
+| Host Runner | 🟢 Active (после setup) |
+| Pipeline | ✅ Готов |
+
+**Готово!** 🎉

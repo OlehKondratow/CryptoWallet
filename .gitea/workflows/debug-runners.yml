@@ -1,0 +1,222 @@
+name: Debug Runners & System Info
+
+on:
+  workflow_dispatch:
+    inputs:
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+jobs:
+  debug-container-runner:
+    name: '🐳 Debug Container Runner'
+    runs-on: ubuntu-latest
+    steps:
+      - name: System Information
+        run: |
+          echo "╔════════════════════════════════════════╗"
+          echo "║     Container Runner - System Info     ║"
+          echo "╚════════════════════════════════════════╝"
+          echo ""
+          echo "🖥️  OS & Kernel:"
+          uname -a
+          echo ""
+          echo "💾 CPU & Memory:"
+          nproc
+          free -h
+          echo ""
+          echo "🔍 Running Processes:"
+          ps aux | grep -E 'act|runner|gitea' | grep -v grep || echo "None found"
+          echo ""
+
+      - name: Container Environment
+        run: |
+          echo "📦 Container Details:"
+          echo "  Hostname: $(hostname)"
+          echo "  IP Addresses:"
+          ip addr show | grep -E 'inet ' | awk '{print "    " $2}'
+          echo ""
+          echo "🌐 Network Connectivity:"
+          curl -s http://gitea:3000/api/v1/version | jq . || echo "Gitea not reachable"
+          echo ""
+
+      - name: Docker/Podman Info
+        run: |
+          echo "🐳 Container Runtime:"
+          which docker podman 2>/dev/null || echo "Neither docker nor podman found"
+          echo ""
+          echo "📡 Docker Socket Status:"
+          ls -la /var/run/docker.sock 2>/dev/null || echo "Socket not found"
+          echo ""
+
+      - name: Workspace & Artifacts
+        run: |
+          echo "📁 Workspace:"
+          pwd
+          ls -lah
+          echo ""
+          echo "🔍 Project Structure:"
+          [ -d ".git" ] && echo "  ✓ Git repository" || echo "  ✗ No git repo"
+          [ -f "Makefile" ] && echo "  ✓ Makefile found" || echo "  ✗ No Makefile"
+          [ -f "CMakeLists.txt" ] && echo "  ✓ CMakeLists.txt found" || echo "  ✗ No CMakeLists.txt"
+          echo ""
+
+      - name: ARM Toolchain
+        run: |
+          echo "🔨 ARM GCC Toolchain:"
+          which arm-none-eabi-gcc || echo "Not installed"
+          arm-none-eabi-gcc --version 2>/dev/null | head -1 || echo "Not available"
+          echo ""
+          echo "📦 Build Tools:"
+          which make || echo "make: not found"
+          which cmake || echo "cmake: not found"
+          which python3 || echo "python3: not found"
+          echo ""
+
+      - name: Detailed Environment (if verbose)
+        if: ${{ github.event.inputs.verbose == 'true' }}
+        run: |
+          echo "🔐 Environment Variables:"
+          env | sort
+          echo ""
+
+  debug-runner-labels:
+    name: '🏷️  Runner Labels & Capabilities'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Runner Info
+        run: |
+          echo "╔════════════════════════════════════════╗"
+          echo "║        Runner Configuration           ║"
+          echo "╚════════════════════════════════════════╝"
+          echo ""
+          echo "📌 Available Labels:"
+          echo "  ubuntu-latest"
+          echo "  ubuntu-24.04"
+          echo "  ubuntu-22.04"
+          echo ""
+
+      - name: Shell & Command Info
+        run: |
+          echo "🐚 Shell Information:"
+          echo "  Shell: $SHELL"
+          echo "  Bash version: $(bash --version | head -1)"
+          echo ""
+
+  debug-hardware-access:
+    name: '⚙️  Hardware Access (Container)'
+    runs-on: ubuntu-latest
+    steps:
+      - name: USB Devices
+        run: |
+          echo "🔌 USB Devices:"
+          which lsusb && lsusb || echo "lsusb not available"
+          echo ""
+
+      - name: Serial Devices
+        run: |
+          echo "📱 Serial Ports:"
+          ls -la /dev/tty* 2>/dev/null | head -10 || echo "No serial devices"
+          ls -la /dev/ttyACM* 2>/dev/null || echo "No ACM devices"
+          ls -la /dev/ttyUSB* 2>/dev/null || echo "No USB serial devices"
+          echo ""
+
+      - name: OpenOCD Probe Check
+        run: |
+          echo "🔍 OpenOCD/Debugger:"
+          which openocd || echo "openocd not installed"
+          which st-flash || echo "st-flash not installed"
+          echo ""
+
+  debug-networking:
+    name: '🌐 Network & Connectivity'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Network Info
+        run: |
+          echo "╔════════════════════════════════════════╗"
+          echo "║         Network Configuration         ║"
+          echo "╚════════════════════════════════════════╝"
+          echo ""
+          echo "🔗 Network Interfaces:"
+          ip addr show | grep -E "^[0-9]:|inet " || echo "No interface info"
+          echo ""
+          echo "🛣️  Routing Table:"
+          ip route show || echo "No routing info"
+          echo ""
+
+      - name: DNS Resolution
+        run: |
+          echo "📡 DNS:"
+          cat /etc/resolv.conf || echo "No resolv.conf"
+          echo ""
+          echo "🔍 Host Resolution:"
+          getent hosts localhost || echo "localhost not found"
+          echo ""
+
+      - name: Port Listening
+        run: |
+          echo "🚪 Open Ports:"
+          which netstat && netstat -tlnp 2>/dev/null | grep LISTEN || echo "netstat not available"
+          echo ""
+
+  system-comparison:
+    name: '📊 Host vs Container Comparison'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Report
+        run: |
+          echo "╔════════════════════════════════════════╗"
+          echo "║    Container Runner Capabilities      ║"
+          echo "╚════════════════════════════════════════╝"
+          echo ""
+          echo "✅ Container Runner Has:"
+          echo "  • Clean sandbox environment"
+          echo "  • Consistent builds"
+          echo "  • Easy cleanup"
+          echo "  • Reproducible CI/CD"
+          echo ""
+          echo "❌ Container Runner Lacks:"
+          echo "  • Direct hardware access (USB, serial)"
+          echo "  • Host filesystem access"
+          echo "  • Native privilege operations"
+          echo ""
+          echo "📝 Note:"
+          echo "  Host runner will have:"
+          echo "  ✓ Direct device access"
+          echo "  ✓ Serial port connectivity"
+          echo "  ✓ Full hardware debugging"
+          echo ""
+
+  cleanup-old-runners:
+    name: '🗑️  Old Runners Cleanup Info'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Info
+        run: |
+          echo "╔════════════════════════════════════════╗"
+          echo "║      Offline Runners Cleanup Guide    ║"
+          echo "╚════════════════════════════════════════╝"
+          echo ""
+          echo "📋 Current Status (from previous check):"
+          echo "  ID 6  - ACTIVE ✅"
+          echo "  ID 3  - OFFLINE ❌ (stale)"
+          echo "  ID 4  - OFFLINE ❌ (stale)"
+          echo "  ID 5  - OFFLINE ❌ (stale)"
+          echo ""
+          echo "🧹 To Clean Up:"
+          echo "  1. Go to: http://localhost:3000/admin/runners"
+          echo "  2. For each offline runner (3, 4, 5):"
+          echo "     - Click Edit button"
+          echo "     - Click Delete"
+          echo "  3. Verify only 2 runners remain:"
+          echo "     - Container runner (ID 6)"
+          echo "     - Host runner (new)"
+          echo ""
+          echo "✨ After cleanup, pipeline will be cleaner!"
+          echo ""
