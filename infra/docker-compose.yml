@@ -58,6 +58,7 @@ services:
   #   http://192.168.127.5:3000
   # (или https://192.168.127.5 если API за TLS на 443). Затем:
   #   systemctl --user restart gitea-runner
+  # Новый registration token: ./infra/reregister-act-runner.sh (токен в infra/.env.local)
 
 networks:
   gitea_lan:
