@@ -1,3 +1,12 @@
+# Simple CI — build in job container; flash/UART on host (container: false).
+#
+# Requirements on the runner host:
+# - act_runner + Podman/Docker for default job containers
+# - For HIL jobs: same machine must expose /dev/ttyACM*, USB ST-LINK, st-flash/st-info
+#
+# Note: `runs-on: host` is NOT used — act_runner registers ubuntu-* labels only unless
+#       you add custom labels in runner config. Use ubuntu-latest + container: false.
+
 name: Simple CI - Build → Flash → Test
 
 on:
@@ -19,9 +28,25 @@ jobs:
 
       - name: Install ARM toolchain
         run: |
-          sudo apt-get update > /dev/null
-          sudo apt-get install -y arm-none-eabi-gcc arm-none-eabi-binutils > /dev/null
-          echo "✓ Toolchain installed"
+          set -eux
+          export DEBIAN_FRONTEND=noninteractive
+          # Job container is often root without `sudo`; support both cases.
+          if [ "$(id -u)" -eq 0 ]; then
+            apt-get update -qq
+            apt-get install -y --no-install-recommends \
+              make \
+              gcc-arm-none-eabi \
+              binutils-arm-none-eabi
+          else
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends \
+              make \
+              gcc-arm-none-eabi \
+              binutils-arm-none-eabi
+          fi
+          arm-none-eabi-gcc --version | head -1
+          make --version | head -1
+          echo "✓ Toolchain + make installed"
 
       - name: Build firmware
         run: |
@@ -46,7 +71,8 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   flash:
     name: '2️⃣ Flash & Reset Device'
-    runs-on: host
+    runs-on: ubuntu-latest
+    container: false
     needs: build
     steps:
       - name: Checkout code
@@ -80,7 +106,8 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   analyse-log:
     name: '3️⃣ Analyse UART Log'
-    runs-on: host
+    runs-on: ubuntu-latest
+    container: false
     needs: flash
     if: always()
     steps:
@@ -195,23 +222,19 @@ jobs:
           lsusb | grep -i stm && echo "✓ STM32 found" || echo "⚠️ No STM32 in USB"
           
           echo ""
-          echo "ST-LINK detection:"
-          st-flash --info 2>&1 | head -5 || echo "⚠️ No ST-LINK detected"
+          echo "ST-LINK / probe:"
+          (command -v st-info >/dev/null && st-info --probe) || \
+          (st-flash --version 2>&1 | head -3) || \
+          echo "⚠️ st-info/st-flash not found or no probe"
 
       - name: Firmware size check
         run: |
-          echo "📦 Checking firmware in flash:"
-          python3 << 'PYTHON_EOF'
-          import os
-          
-          # Check if device is accessible
-          try:
-              # Try to read device info via st-flash (doesn't require flashing)
-              os.system("st-flash --info")
-              print("✓ Device accessible")
-          except:
-              print("⚠️ Device not accessible (may not be connected)")
-          PYTHON_EOF
+          echo "📦 Checking ST-LINK / target (if tools present):"
+          if command -v st-info >/dev/null 2>&1; then
+            st-info --probe || echo "⚠️ st-info probe failed"
+          else
+            echo "⚠️ st-info not installed on host"
+          fi
 
       - name: Basic UART ping test (if available)
         run: |
@@ -255,7 +278,8 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   hardware-test:
     name: '5️⃣ Hardware Firmware Test'
-    runs-on: host
+    runs-on: ubuntu-latest
+    container: false
     needs: quick-test
     if: always()
     timeout-minutes: 30
