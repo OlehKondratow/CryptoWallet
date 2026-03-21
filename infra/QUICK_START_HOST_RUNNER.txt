@@ -47,21 +47,16 @@ http://localhost:3000/admin/runners
 
 ## 🧪 Тестирование
 
-### Запустить debug workflow:
+### Запустить CI (simple-ci):
 
 ```bash
 cd /data/projects/CryptoWallet
-git add .gitea/workflows/debug-runners.yml
-git commit -m "Add debug runners workflow"
+git add .gitea/workflows/simple-ci.yml
+git commit -m "ci: trigger Simple CI"   # если файл уже в репо — достаточно пустого commit + push
 git push
 ```
 
-Затем в Gitea:
-1. **Actions**
-2. **Debug Runners & System Info**
-3. **Run workflow**
-
-Результаты покажут обе раннеры в деле.
+Затем в Gitea: **Actions** → **Simple CI** → при необходимости **Run workflow** (если в workflow есть `workflow_dispatch`).
 
 ---
 

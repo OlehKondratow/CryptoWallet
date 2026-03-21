@@ -847,7 +847,7 @@ infra/
 └── settings.json                   [Project settings]
 
 .gitea/workflows/
-└── build-test-hil.yml             [CI/CD pipeline]
+└── simple-ci.yml                  [CI/CD pipeline]
 
 docs_src/
 └── infrastructure.md               [Это руководство]

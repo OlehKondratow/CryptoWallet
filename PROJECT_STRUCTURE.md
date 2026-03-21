@@ -50,11 +50,7 @@
 │
 ├── 📁 .gitea/                       ← ⚙️  CI/CD CONFIGURATION
 │   └── workflows/                   ← GitHub Actions / Gitea Actions
-│       ├── test-runner.yml          ← Simple runner test
-│       ├── build-test-hil.yml       ← Full build + HIL test
-│       ├── stm32-make-workflow.yml  ← Makefile-based build
-│       ├── stm32-manual-test.yml    ← Manual test phases
-│       └── debug-runners.yml        ← Debug runner info
+│       └── simple-ci.yml            ← Основной CI pipeline
 │
 ├── 📁 infra/                        ← 🐙 INFRASTRUCTURE
 │   ├── docker-compose.yml           ← Gitea service config
@@ -223,10 +219,7 @@ openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
 ### CI/CD Workflows
 | File | Trigger | Duration |
 |------|---------|----------|
-| `test-runner.yml` | Manual | <1 min |
-| `stm32-make-workflow.yml` | Manual | 5 min |
-| `build-test-hil.yml` | Manual | 30+ min |
-| `stm32-manual-test.yml` | Manual | Varies |
+| `simple-ci.yml` | push `main`, `workflow_dispatch` | см. workflow |
 
 ---
 

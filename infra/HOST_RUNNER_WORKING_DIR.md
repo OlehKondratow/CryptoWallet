@@ -245,8 +245,8 @@ Podman Socket: /run/user/1000/podman/podman.sock
 
 ## 🎯 Next Steps
 
-1. **Test basic workflow**: Push to trigger `.gitea/workflows/test-runner.yml`
-2. **Test build**: Trigger `.gitea/workflows/stm32-make-workflow.yml`
+1. **Test CI**: Push в `main` или запуск `.gitea/workflows/simple-ci.yml` вручную (Actions)
+2. **Доп. сценарии**: при необходимости добавьте отдельные workflow-файлы в `.gitea/workflows/`
 3. **Test UART**: Create custom workflow with `capture_rng_uart.py`
 4. **Full HIL**: When hardware is connected
 

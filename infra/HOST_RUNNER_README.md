@@ -220,7 +220,7 @@ curl http://localhost:3000/api/v1/version
 
 ## 📝 Testing
 
-Create a simple workflow in `.gitea/workflows/test-runners.yml`:
+Проект использует `.gitea/workflows/simple-ci.yml`. Пример отдельного тестового workflow:
 
 ```yaml
 name: Test Both Runners
