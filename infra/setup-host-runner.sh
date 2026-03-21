@@ -38,35 +38,43 @@ fi
 
 cd "${RUNNER_HOME}"
 
-# Step 1: Download Act Runner
+# Step 1: Check for existing Act Runner binary
 echo ""
-echo "📥 Downloading Act Runner..."
-DOWNLOAD_URL="https://dl.gitea.io/act_runner/${RUNNER_VERSION}/act_runner-${RUNNER_VERSION}-${RUNNER_ARCH}.tar.gz"
-echo "   URL: ${DOWNLOAD_URL}"
+if [ -f "/usr/local/bin/act_runner" ]; then
+    echo "✅ Found existing Act Runner at /usr/local/bin/act_runner"
+    cp /usr/local/bin/act_runner "${RUNNER_HOME}/act_runner"
+    chmod +x "${RUNNER_HOME}/act_runner"
+    echo "✅ Copied to ${RUNNER_HOME}/"
+else
+    echo "📥 Downloading Act Runner..."
+    DOWNLOAD_URL="https://dl.gitea.io/act_runner/${RUNNER_VERSION}/act_runner-${RUNNER_VERSION}-${RUNNER_ARCH}.tar.gz"
+    echo "   URL: ${DOWNLOAD_URL}"
 
-if ! wget -q "${DOWNLOAD_URL}" -O "act_runner-${RUNNER_VERSION}-${RUNNER_ARCH}.tar.gz"; then
-    echo "❌ Failed to download Act Runner"
-    exit 1
+    if ! wget -q "${DOWNLOAD_URL}" -O "act_runner-${RUNNER_VERSION}-${RUNNER_ARCH}.tar.gz"; then
+        echo "❌ Failed to download Act Runner"
+        exit 1
+    fi
+
+    echo "✅ Downloaded"
+
+    # Step 2: Extract
+    echo ""
+    echo "📦 Extracting..."
+    tar -xzf "act_runner-${RUNNER_VERSION}-${RUNNER_ARCH}.tar.gz"
+    rm "act_runner-${RUNNER_VERSION}-${RUNNER_ARCH}.tar.gz"
+    chmod +x act_runner
+    echo "✅ Extracted"
 fi
-
-echo "✅ Downloaded"
-
-# Step 2: Extract
-echo ""
-echo "📦 Extracting..."
-tar -xzf "act_runner-${RUNNER_VERSION}-${RUNNER_ARCH}.tar.gz"
-rm "act_runner-${RUNNER_VERSION}-${RUNNER_ARCH}.tar.gz"
-chmod +x act_runner
-echo "✅ Extracted"
 
 # Step 3: Generate config
 echo ""
 echo "⚙️  Generating config..."
 if [ -f "config.yaml" ]; then
-    echo "   Config already exists, skipping generation"
-else
-    ./act_runner generate-config > config.yaml
+    echo "   Config already exists, backing up..."
+    mv config.yaml config.yaml.bak
 fi
+
+${RUNNER_HOME}/act_runner generate-config > config.yaml
 
 # Step 4: Configure
 echo ""
@@ -135,7 +143,7 @@ fi
 # Step 6: Register
 echo ""
 echo "📝 Registering runner..."
-if ./act_runner register \
+if ${RUNNER_HOME}/act_runner register \
     --instance "${GITEA_URL}" \
     --token "${GITEA_TOKEN}" \
     --name "${RUNNER_NAME}" \
