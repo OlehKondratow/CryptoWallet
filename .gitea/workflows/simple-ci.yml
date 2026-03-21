@@ -1,18 +1,15 @@
-# Simple CI — self-hosted Gitea: job-контейнер НЕ видит localhost:3000 хоста.
-# Поэтому build и все шаги с checkout/upload на этом runner — container: false (хост).
+# Simple CI — self-hosted Gitea (act_runner).
 #
-# Runner reality (ваша установка):
-# - act_runner может работать от root; рабочий каталог job = checkout (часто под
-#   /var/run/act/... или /workspace/.../CryptoWallet внутри job-контейнера).
-# - Джобы с container: false выполняются на хосте тем же UID, что и act_runner
-#   (root → прямой доступ к /dev/ttyACM*, st-flash без plugdev-ограничений).
-# - Сборка (build) тоже на хосте (container: false), иначе git fetch к Gitea падает.
+# НЕ используйте `container: false` в job: в act_runner v0.3.x это даёт образ
+# `docker.io/library/false` (булево читается как имя образа). Вместо этого
+# зарегистрируйте runner с меткой выполнения на хосте:
+#   act_runner register ... --labels "ubuntu-latest:host"
+# (см. infra/reregister-act-runner.sh — по умолчанию так и есть).
+# Тогда `runs-on: ubuntu-latest` выполняется на хосте: checkout к Gitea, /dev/ttyACM*, st-flash.
 #
 # Requirements:
-# - Podman/Docker для job-контейнеров
+# - Runner: метка ubuntu-latest:host (не docker://… для этого workflow)
 # - Для HIL: ST-LINK, st-flash/st-info, UART на том же хосте, что и runner
-#
-# Labels: используйте ubuntu-latest (не `host`, если раннер не регистрировали с этим label).
 
 name: Simple CI - Build → Flash → Test
 
@@ -34,8 +31,6 @@ jobs:
   build:
     name: '1️⃣ Build Firmware'
     runs-on: ubuntu-latest
-    # Иначе внутри Docker localhost:3000 ≠ Gitea на хосте → checkout падает с connection refused
-    container: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -86,7 +81,6 @@ jobs:
   flash:
     name: '2️⃣ Flash & Reset Device'
     runs-on: ubuntu-latest
-    container: false
     needs: build
     steps:
       - name: Checkout code
@@ -121,7 +115,6 @@ jobs:
   analyse-log:
     name: '3️⃣ Analyse UART Log'
     runs-on: ubuntu-latest
-    container: false
     needs: flash
     if: always()
     steps:
@@ -212,7 +205,6 @@ jobs:
   quick-test:
     name: '4️⃣ Quick Preliminary Test'
     runs-on: ubuntu-latest
-    container: false
     needs: analyse-log
     if: always()
     timeout-minutes: 5
@@ -294,7 +286,6 @@ jobs:
   hardware-test:
     name: '5️⃣ Hardware Firmware Test'
     runs-on: ubuntu-latest
-    container: false
     needs: quick-test
     if: always()
     timeout-minutes: 30
@@ -365,7 +356,6 @@ jobs:
   report:
     name: '📋 CI Pipeline Report'
     runs-on: ubuntu-latest
-    container: false
     needs: [ build, flash, analyse-log, quick-test, hardware-test ]
     if: always()
     steps:
