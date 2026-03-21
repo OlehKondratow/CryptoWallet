@@ -37,51 +37,9 @@ services:
       retries: 5
       start_period: 30s
 
-  # Act Runner for CI/CD
-  gitea-runner:
-    image: docker.io/gitea/act_runner:nightly
-    container_name: cryptowallet-runner
-    restart: unless-stopped
-    networks:
-      - dev-network
-    depends_on:
-      gitea:
-        condition: service_healthy
-    environment:
-      - GITEA_INSTANCE_URL=http://gitea:3000
-      - GITEA_RUNNER_REGISTRATION_TOKEN=${GITEA_RUNNER_TOKEN:-placeholder}
-      - RUNNER_NAME=crypto-wallet-hil-runner
-      - RUNNER_LABELS=linux/amd64,hil
-      - RUNNER_CAPACITY=1
-      - LOG_LEVEL=info
-    volumes:
-      # Dev filesystem for hardware access
-      - /dev:/dev:rw
-      - /dev/bus/usb:/dev/bus/usb:rw
-      # Explicit serial device mappings
-      - /dev/ttyACM0:/dev/ttyACM0:rw
-      - /dev/ttyACM1:/dev/ttyACM1:rw
-      - /dev/ttyUSB0:/dev/ttyUSB0:rw
-      - /dev/ttyUSB1:/dev/ttyUSB1:rw
-      # Workspace for builds (RUNNER uses this for job execution)
-      - runner_work:/home/runner
-      # Cache volumes
-      - runner_cache:/cache
-    security_opt:
-      - apparmor=unconfined
-    cap_add:
-      - SYS_ADMIN
-      - NET_ADMIN
-      - SYS_PTRACE
-    privileged: true
-    devices:
-      # ST-LINK debugger
-      - /dev/bus/usb:/dev/bus/usb:rw
-    healthcheck:
-      test: ["CMD", "pgrep", "-f", "act"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # NOTE: Act Runner is now installed on the host (~/gitea-runner)
+  # Run via systemd service: systemctl --user status gitea-runner
+  # This provides direct hardware access to UART, USB devices, and ST-LINK
 
   # Optional: PostgreSQL for Gitea (more reliable than SQLite)
   # Uncomment to use PostgreSQL instead of SQLite
@@ -108,9 +66,5 @@ networks:
     driver: bridge
 
 volumes:
-  runner_work:
-    driver: local
-  runner_cache:
-    driver: local
   # postgres_data:
   #   driver: local
