@@ -169,6 +169,7 @@ Documentation=https://docs.gitea.io/en-us/act/
 [Service]
 Type=simple
 WorkingDirectory=${RUNNER_HOME}
+Environment="DOCKER_HOST=unix:///run/user/1000/podman/podman.sock"
 ExecStart=${RUNNER_HOME}/act_runner daemon
 Restart=on-failure
 RestartSec=10s
