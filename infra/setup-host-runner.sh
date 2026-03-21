@@ -8,7 +8,8 @@ RUNNER_VERSION="v0.3.0"
 RUNNER_ARCH="linux_amd64"
 RUNNER_HOME="${HOME}/gitea-runner"
 RUNNER_NAME="host-runner-$(hostname)"
-GITEA_URL="${GITEA_URL:-http://localhost:3000}"
+# С Gitea на macvlan (см. infra/docker-compose.yml) API с хоста: http://192.168.127.5:3000
+GITEA_URL="${GITEA_URL:-http://192.168.127.5:3000}"
 GITEA_TOKEN="${GITEA_TOKEN:-}"
 
 echo "═══════════════════════════════════════════════════════"
