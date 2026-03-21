@@ -1,6 +1,6 @@
 version: '3.8'
 
-# Gitea с фиксированным IP в LAN: 192.168.127.4/23, шлюз 192.168.126.1
+# Gitea с фиксированным IP в LAN: 192.168.127.5/23, шлюз 192.168.126.1
 # ---------------------------------------------------------------------------
 # Используется driver: macvlan — контейнер «сидит» в той же подсети, что и ПК.
 # Родитель macvlan — интерфейс в 192.168.126.0/23. На этом хосте: eno1 (= altname enp0s31f6),
@@ -8,10 +8,10 @@ version: '3.8'
 #   export GITEA_MACVLAN_PARENT=enp0s31f6
 #   podman-compose -f infra/docker-compose.yml up -d
 #
-# Убедитесь, что 192.168.127.4 свободен. На rootless Podman macvlan может быть ограничен.
+# Убедитесь, что 192.168.127.5 свободен. На rootless Podman macvlan может быть ограничен.
 #
-# Доступ: http://192.168.127.4:3000  |  git+ssh: ssh://git@192.168.127.4:22
-# Старый вариант с пробросом localhost:3000 при macvlan не используется — см. порт ниже.
+# Публичный URL (HTTPS): https://192.168.127.5/ — обычно за reverse proxy (443→3000).
+# Прямой HTTP к контейнеру: http://192.168.127.5:3000  |  git+ssh: ssh://git@192.168.127.5:22
 
 services:
   gitea:
@@ -20,7 +20,7 @@ services:
     restart: unless-stopped
     networks:
       gitea_lan:
-        ipv4_address: 192.168.127.4
+        ipv4_address: 192.168.127.5
     volumes:
       - /data/gitea/data:/data
       - /data/gitea/repositories:/data/git/repositories
@@ -38,11 +38,12 @@ services:
       - GITEA__SECURITY__INSTALL_LOCK=true
       - GITEA__SERVICE__DISABLE_REGISTRATION=false
       - GITEA__RUN_MODE=prod
-      - GITEA__SERVER__DOMAIN=192.168.127.4
-      - GITEA__SERVER__ROOT_URL=http://192.168.127.4:3000/
+      - GITEA__SERVER__DOMAIN=192.168.127.5
+      # Внешний адрес для ссылок (HTTPS); контейнер слушает HTTP :3000 — TLS на прокси или в app.ini
+      - GITEA__SERVER__ROOT_URL=https://192.168.127.5/
       - GITEA__SERVER__SSH_PORT=22
       - GITEA__SERVER__HTTP_PORT=3000
-      - ROOT_URL=http://192.168.127.4:3000/
+      - ROOT_URL=https://192.168.127.5/
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/v1/version"]
       interval: 10s
