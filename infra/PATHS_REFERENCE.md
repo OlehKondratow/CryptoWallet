@@ -1,5 +1,15 @@
 # Full Paths Reference - Host Runner & CI
 
+## Act runner: root vs обычный пользователь
+
+- Если **act_runner запущен от root** (в т.ч. «из каталога проекта»): домашний каталог
+  — `/root/`, конфиг может лежать рядом с бинарником или в `/root/gitea-runner/`;
+  шаги с `container: false` выполняются **от root** на хосте.
+- Если runner от **обычного пользователя** (пример ниже с `pilgrim`): пути вида
+  `/home/pilgrim/gitea-runner/`, для Podman — `DOCKER_HOST=unix:///run/user/UID/...`.
+
+Ниже — пример для пользовательского runner; замените `/home/pilgrim` на вашу схему.
+
 ## 🏠 Local Machine Paths
 
 ### Host Runner Installation

@@ -1,11 +1,17 @@
 # Simple CI — build in job container; flash/UART on host (container: false).
 #
-# Requirements on the runner host:
-# - act_runner + Podman/Docker for default job containers
-# - For HIL jobs: same machine must expose /dev/ttyACM*, USB ST-LINK, st-flash/st-info
+# Runner reality (ваша установка):
+# - act_runner может работать от root; рабочий каталог job = checkout (часто под
+#   /var/run/act/... или /workspace/.../CryptoWallet внутри job-контейнера).
+# - Джобы с container: false выполняются на хосте тем же UID, что и act_runner
+#   (root → прямой доступ к /dev/ttyACM*, st-flash без plugdev-ограничений).
+# - Сборка (build) по-прежнему в образе ubuntu-latest — там обычно root, apt без sudo.
 #
-# Note: `runs-on: host` is NOT used — act_runner registers ubuntu-* labels only unless
-#       you add custom labels in runner config. Use ubuntu-latest + container: false.
+# Requirements:
+# - Podman/Docker для job-контейнеров
+# - Для HIL: ST-LINK, st-flash/st-info, UART на том же хосте, что и runner
+#
+# Labels: используйте ubuntu-latest (не `host`, если раннер не регистрировали с этим label).
 
 name: Simple CI - Build → Flash → Test
 
