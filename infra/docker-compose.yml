@@ -3,10 +3,10 @@ version: '3.8'
 # Gitea с фиксированным IP в LAN: 192.168.127.4/23, шлюз 192.168.126.1
 # ---------------------------------------------------------------------------
 # Используется driver: macvlan — контейнер «сидит» в той же подсети, что и ПК.
-# Обязательно задайте интерфейс хоста, который смотрит в эту сеть:
+# Родитель macvlan — интерфейс в 192.168.126.0/23. На этом хосте: eno1 (= altname enp0s31f6),
+# адрес хоста 192.168.126.3/23. По умолчанию parent=eno1; при необходимости:
 #   export GITEA_MACVLAN_PARENT=enp0s31f6
 #   podman-compose -f infra/docker-compose.yml up -d
-# (имя смотрите: ip -br addr  |  nmcli device status)
 #
 # Убедитесь, что 192.168.127.4 свободен. На rootless Podman macvlan может быть ограничен.
 #
@@ -56,8 +56,8 @@ networks:
   gitea_lan:
     driver: macvlan
     driver_opts:
-      # Физический интерфейс с адресом в 192.168.126.0/23 (замените на свой)
-      parent: ${GITEA_MACVLAN_PARENT:-eth0}
+      # eno1 / enp0s31f6 — один и тот же NIC на ws8
+      parent: ${GITEA_MACVLAN_PARENT:-eno1}
     ipam:
       config:
         - subnet: 192.168.126.0/23
