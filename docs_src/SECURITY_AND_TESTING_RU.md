@@ -48,9 +48,9 @@
 | Реализация | `Core/Src/fw_integrity.c`, `Core/Inc/fw_integrity.h` |
 | Границы образа | символы линкера `__app_flash_start` / `__app_flash_end` в `STM32H743ZITx_FLASH_LWIP.ld` |
 | Старт | `fw_integrity_init()` после `HW_Init()` в `main.c`; в лог — строка вида `FWINFO crc32=0x...,len=...,start=0x...,end=0x...` |
-| Сверка на хосте | `scripts/fw_integrity_check.py` для `build/cryptowallet.bin` (опционально `--expect-crc` из лога устройства) |
+| Сверка на хосте | `scripts/fw_integrity_check.py` для `build/cryptowallet.bin` (опционально `--expect-crc` или **`--expect-fwinfo-line`** с полной строкой из `AT+FWINFO?` / лога — проверка CRC и **длины** файла) |
 
-**Сопоставление с `.bin`:** CRC и длина относятся к **непрерывному диапазону** Flash приложения. Файл `cryptowallet.bin` от `objcopy` должен соответствовать тому же образу; если хвост сектора заполнен `0xFF`, это уже отражено в границах `end` — при расхождениях смотрите параметры `objcopy` и линковку.
+**Сопоставление с `.bin`:** CRC и длина относятся к **непрерывному диапазону** Flash приложения. Файл `cryptowallet.bin` от `objcopy` должен соответствовать тому же образу; если хвост сектора заполнен `0xFF`, это уже отражено в границах `end` — при расхождениях смотрите параметры `objcopy` и линковку. Подробнее о том, когда CRC совпадает с устройством, — в docstring **`scripts/fw_integrity_check.py`**.
 
 **CWUP:** команда **`AT+FWINFO?`** возвращает ту же строку, что и лог **`FWINFO`** (`fw_integrity_snprint()`), если CWUP включён (сборка без `USE_RNG_DUMP`).
 
@@ -59,6 +59,8 @@
 ## 4. UART (CWUP) и тестирование защиты/целостности
 
 Протокол: **[UART_PROTOCOL_MVP_ru.md](UART_PROTOCOL_MVP_ru.md)**.
+
+**Таблица статуса команд** (что реализовано в прошивке, а что только в спецификации): **[UART_PROTOCOL_MVP_ru.md](UART_PROTOCOL_MVP_ru.md) §10**.
 
 | Задача | Команда / действие |
 |--------|---------------------|
@@ -70,6 +72,8 @@
 | HIL: CWUP по UART | `scripts/test_cwup_mvp.py` — `AT+BOOTCHAIN?`, стресс: `--stress-extra-rounds N`; опц. `--bin`; без платы: `CWUP_SKIP_NO_DEVICE=1` |
 
 **Ограничение:** при **`USE_RNG_DUMP=1`** CWUP не активируется (тот же UART занят бинарным TRNG).
+
+**Два режима TRNG по UART (не смешивать):** сборка с **`USE_RNG_DUMP=1`** выводит **сырой** непрерывный поток TRNG на UART3 и **отключает** текстовый CWUP. **Кадрированный** поток по спецификации CWUP (§7, команды **`AT+RNG=START`** / **`AT+RNG=STOP`**, ответ **`CW+RNG OPEN`**) — **отдельная** задуманная фича и **пока не реализована** в `Core/Src/cwup_uart.c`; это не то же самое, что «сырой» дамп.
 
 ---
 

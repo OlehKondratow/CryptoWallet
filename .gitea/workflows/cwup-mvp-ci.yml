@@ -3,7 +3,8 @@
 # Simple CI по умолчанию собирает USE_RNG_DUMP=1 → на UART нет CWUP. Этот workflow
 # всегда собирает USE_RNG_DUMP=0, прошивает плату и запускает scripts/test_cwup_mvp.py.
 #
-# Требования: runner cryptowallet-host:host, ST-LINK, /dev/ttyACM0, деревья из CRYPTO_DEPS_ROOT.
+# Требования: runner cryptowallet-host:host, ST-LINK, UART (ST-Link VCP; см. --auto-port), деревья из CRYPTO_DEPS_ROOT.
+# act/Docker: пробросьте устройство хоста, иначе /dev/ttyACM0 в контейнере пустой (0 символов с UART).
 #
 # Очередь с другими workflow: см. concurrency (общий group для serial доступа к ST-LINK).
 #
@@ -100,6 +101,12 @@ jobs:
           make USE_RNG_DUMP=0 USE_WEBUSB=1 USE_TEST_SEED=1 -j"$(nproc)"
           ls -lh build/cryptowallet.bin build/cryptowallet.elf
 
+      - name: FW integrity — host CRC/size on cryptowallet.bin
+        run: |
+          set -euo pipefail
+          test -f build/cryptowallet.bin
+          python3 scripts/fw_integrity_check.py build/cryptowallet.bin
+
       - name: MVP host tests (pytest)
         run: |
           set -euo pipefail
@@ -140,9 +147,8 @@ jobs:
             exit 1
           fi
           echo "📤 Flash CWUP firmware (USE_RNG_DUMP=0) -> 0x08000000"
-          st-flash --reset write build/cryptowallet.bin 0x08000000 || \
-            { echo "::warning::st-flash failed (no ST-LINK?)"; exit 0; }
-          sleep 2
+          st-flash --reset write build/cryptowallet.bin 0x08000000
+          sleep 4
           echo "✅ Flash done"
 
       - name: Run CWUP AT smoke + stress (UART)
@@ -155,8 +161,12 @@ jobs:
           export CWUP_UART_PORT="${CI_UART_PORT:-/dev/ttyACM0}"
           export CWUP_EXPECT_WALLET_SEED="${CI_CWUP_EXPECT_WALLET_SEED:-1}"
           export CWUP_EXPECT_CRYPTO_SIGN="${CI_CWUP_EXPECT_CRYPTO_SIGN:-1}"
-          echo "📡 test_cwup_mvp.py port=$CWUP_UART_PORT stress=${CI_CWUP_STRESS_ROUNDS} skip_no_device=$CWUP_SKIP_NO_DEVICE expect_seed=$CWUP_EXPECT_WALLET_SEED"
+          echo "📡 Serial devices (ST-Link VCP should appear as ttyACM*):"
+          ls -la /dev/ttyACM* 2>/dev/null || echo "(no /dev/ttyACM*)"
+          ls -la /dev/serial/by-id/*ST* 2>/dev/null || true
+          echo "📡 test_cwup_mvp.py --auto-port port=$CWUP_UART_PORT stress=${CI_CWUP_STRESS_ROUNDS} skip_no_device=$CWUP_SKIP_NO_DEVICE expect_seed=$CWUP_EXPECT_WALLET_SEED"
           "$PY" scripts/test_cwup_mvp.py \
+            --auto-port \
             --port "${CWUP_UART_PORT}" \
             --bin build/cryptowallet.bin \
             --stress-extra-rounds "${CI_CWUP_STRESS_ROUNDS:-10}" \

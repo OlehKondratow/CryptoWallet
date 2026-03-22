@@ -5,11 +5,13 @@ from __future__ import annotations
 import pytest
 
 from mvp_cwup import (
+    first_cw_ready_line,
     parse_bootchain_line,
     parse_echo_response,
     parse_fwinfo_crc,
     parse_selftest_line,
     parse_wallet_line,
+    phase_a_prefix_before_ready,
 )
 
 
@@ -51,3 +53,14 @@ def test_parse_selftest_line() -> None:
 def test_parse_echo_response() -> None:
     assert parse_echo_response("CW+ECHO,hello") == "hello"
     assert parse_echo_response("CW+ECHO,") == ""
+
+
+def test_phase_a_vs_cw_ready() -> None:
+    """Phase A: optional TEXT preamble; phase B: first CW+READY line."""
+    preamble = "[INFO] boot ok\r\n[WARN] net pending\r\n"
+    ready = "CW+READY,proto=CWUP/0.1,build=abc,rng=0\r\n"
+    buf = preamble + ready
+    assert phase_a_prefix_before_ready(buf) == preamble
+    assert first_cw_ready_line(buf) == "CW+READY,proto=CWUP/0.1,build=abc,rng=0"
+    assert first_cw_ready_line("no marker here") is None
+    assert phase_a_prefix_before_ready("no marker") == "no marker"

@@ -2,11 +2,18 @@
  * @file cwup_uart.c
  * @brief CWUP-0.1 minimal command set on USART3 (RX IT + line queue).
  * @note Not built when USE_RNG_DUMP=1 (binary TRNG stream on same UART).
+ *
+ * Phases (do not mix with @c USE_RNG_DUMP raw binary build):
+ * - **A:** Until the first @c CW+READY line — no §7 TRNG frames; optional TEXT from other tasks (e.g. display log) is allowed.
+ * - **B:** The single @c CW+READY,...\\r\\n line (emitted once at CWUP task start).
+ * - **C:** TEXT command mode (@c AT+ / @c CW+).
+ * - **D:** Framed TRNG (§7) after @c AT+RNG=START — not implemented here; reserved.
  */
 
 #include "main.h"
 #include "hw_init.h"
 #include "fw_integrity.h"
+#include "cwup_uart.h"
 #include "cwup_wallet_probe.h"
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_uart.h"
@@ -26,6 +33,14 @@
 #define CW_VERIFIED_BOOT 0
 #endif
 
+/**
+ * @brief 1 when framed TRNG via @c AT+RNG=START (§7) is implemented and available in this build.
+ * @note Not the same as @c USE_RNG_DUMP (raw stream, CWUP disabled). Not tied to @c USE_CRYPTO_SIGN.
+ */
+#ifndef CWUP_RNG_FRAMED_AVAILABLE
+#define CWUP_RNG_FRAMED_AVAILABLE 0
+#endif
+
 #define CWUP_LINE_MAX        256U
 #define CWUP_QUEUE_DEPTH     4U
 #define CWUP_TASK_STACK      768U
@@ -38,6 +53,16 @@ static TaskHandle_t s_cwup_task;
 static uint8_t s_rx_byte;
 static char s_asm[CWUP_LINE_MAX];
 static size_t s_asm_len;
+static volatile cwup_line_phase_t s_line_phase = CWUP_PHASE_A_PRE_READY;
+
+static int cwup_rng_proto_advertise(void)
+{
+#if CWUP_RNG_FRAMED_AVAILABLE
+    return 1;
+#else
+    return 0;
+#endif
+}
 
 static void cwup_send_crlf(const char *line)
 {
@@ -92,11 +117,8 @@ static void cwup_handle_echo_payload(const char *payload)
 static void cwup_send_ready_banner(void)
 {
     char buf[160];
-#if defined(USE_CRYPTO_SIGN) || defined(USE_RNG_DUMP)
-    const int rng_flag = 1;
-#else
-    const int rng_flag = 0;
-#endif
+    const int rng_flag = cwup_rng_proto_advertise();
+
     (void)snprintf(buf, sizeof(buf),
                    "CW+READY,proto=%s,build=%s,rng=%d",
                    CWUP_PROTO, CW_GIT_VERSION, rng_flag);
@@ -150,11 +172,8 @@ static void cwup_handle_line(const char *line)
     }
     if (strcmp(work, "at+ready?") == 0) {
         char r[192];
-#if defined(USE_CRYPTO_SIGN) || defined(USE_RNG_DUMP)
-        const int rng_flag = 1;
-#else
-        const int rng_flag = 0;
-#endif
+        const int rng_flag = cwup_rng_proto_advertise();
+
         (void)snprintf(r, sizeof(r),
                        "CW+READY,proto=%s,build=%s,rng=%d",
                        CWUP_PROTO, CW_GIT_VERSION, rng_flag);
@@ -222,8 +241,10 @@ static void cwup_task(void *arg)
     char line[CWUP_LINE_MAX];
 
     (void)arg;
+    s_line_phase = CWUP_PHASE_A_PRE_READY;
     cwup_start_rx();
     cwup_send_ready_banner();
+    s_line_phase = CWUP_PHASE_C_TEXT_CMD;
 
     for (;;) {
         if (xQueueReceive(s_line_q, line, portMAX_DELAY) == pdTRUE) {
@@ -259,6 +280,11 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
     }
 
     portYIELD_FROM_ISR(hpw);
+}
+
+cwup_line_phase_t Cwup_GetLinePhase(void)
+{
+    return s_line_phase;
 }
 
 void Cwup_Init(void)

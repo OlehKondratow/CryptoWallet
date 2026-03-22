@@ -179,10 +179,18 @@ jobs:
           echo "✅ Build complete:"
           ls -lh build/cryptowallet.bin build/cryptowallet.elf
 
+      - name: FW integrity — host CRC/size on cryptowallet.bin
+        run: |
+          set -euo pipefail
+          echo "📦 scripts/fw_integrity_check.py (IEEE CRC32 + size; same algorithm as fw_integrity.c)"
+          test -f build/cryptowallet.bin
+          python3 scripts/fw_integrity_check.py build/cryptowallet.bin
+          echo "✅ fw_integrity_check OK"
+
       - name: MVP host tests (pytest tests/mvp)
         run: |
           set -euo pipefail
-          echo "🧪 MVP host tests: CRC, CWUP parsing, secure_boot image tamper (ecdsa)"
+          echo "🧪 MVP host tests: fw_integrity (unit), CWUP parsing, secure_boot tamper (ecdsa)"
           python3 -m venv .venv-ci-mvp
           .venv-ci-mvp/bin/pip install -q -U pip
           .venv-ci-mvp/bin/pip install -q pytest "ecdsa>=0.18,<1"
@@ -322,6 +330,7 @@ jobs:
             exit 0
           fi
           echo "📡 MVP CWUP HIL: WALLET/SELFTEST/ECHO + PING… FWINFO+CRC / BOOTCHAIN + stress"
+          ls -la /dev/ttyACM* 2>/dev/null || echo "(no /dev/ttyACM*)"
           python3 -m venv .venv-ci-cwup
           .venv-ci-cwup/bin/pip install -q -U pip pyserial
           PY="$(pwd)/.venv-ci-cwup/bin/python3"
@@ -330,6 +339,7 @@ jobs:
           export CWUP_EXPECT_WALLET_SEED="${CI_CWUP_EXPECT_WALLET_SEED:-0}"
           export CWUP_EXPECT_CRYPTO_SIGN="${CI_CWUP_EXPECT_CRYPTO_SIGN:-0}"
           "$PY" scripts/test_cwup_mvp.py \
+            --auto-port \
             --port "${CWUP_UART_PORT}" \
             --bin build/cryptowallet.bin \
             --stress-extra-rounds "${CI_CWUP_STRESS_ROUNDS:-5}" \

@@ -39,12 +39,16 @@
 
 After `osKernelStart()`: Display, Net, Sign, IO, User, (optional) RNG.
 
-**MVP readiness phases:**
+**Line phases (keep distinct in firmware, tests, and CI — do not conflate with raw `USE_RNG_DUMP=1`):**
 
-1. **Phase A:** until `CW+READY`, no TRNG **frames**; optional TEXT logs only.
-2. **Phase B:** single line:  
-   `CW+READY,proto=CWUP/0.1,build=<git-describe|unknown>,rng=1|0\r\n`
-3. **Phase C:** host sends commands (§5); TRNG frames only after `AT+RNG=START`.
+| Phase | Meaning | Device TX | Notes |
+|-------|---------|-----------|-------|
+| **A** | Startup before CWUP readiness | *TEXT* only (`\r\n`); **no** §7 TRNG frames | Other tasks may log on the same UART (app preamble after bootloader). Host treats the link as **not** CWUP-ready until phase B. |
+| **B** | Readiness announcement | One *TEXT* line: `CW+READY,proto=CWUP/0.1,build=<git-describe|unknown>,rng=0|1\r\n` | `rng=1` means framed TRNG via CWUP (`AT+RNG=START`, §7) is available in **this** build — **not** the raw `USE_RNG_DUMP` stream. |
+| **C** | Commands, TEXT mode (T) | `CW+...` replies to `AT+...` (§5) | Until a successful `AT+RNG=START`, no §7 frames; line stays TEXT. Typical CI: wait for `CW+READY` → optional markers → further AT commands. |
+| **D** | Binary TRNG session (protocol T→B) | §7 frames only on TX | Starts after `AT+RNG=START` and a response such as `CW+RNG OPEN` (**not implemented** in firmware yet). In D, `printf` logs on that UART are forbidden without coordinated TX locking. Exit: `AT+RNG=STOP`, timeout, RNG error, reset → back to TEXT (phase C). |
+
+Firmware `Core/Src/cwup_uart.c` tracks **A→B→C** around the first `CW+READY` line; phase **D** is reserved until `AT+RNG=START` is implemented.
 
 ---
 
@@ -141,12 +145,25 @@ Host extracts payload bytes only; validates CRC per frame.
 
 ## 10. Implementation status (firmware)
 
-- **Implemented** when **`USE_RNG_DUMP` is off**: USART3 RX (`HAL_UART_Receive_IT`), line assembly, **`CWUP`** task, shared TX mutex with logs (and with RNG blocks when `USE_RNG_DUMP=1`). Commands: `AT+PING`, `AT+CWINFO?`, `AT+READY?`, `AT+FWINFO?`, `AT+BOOTCHAIN?`, `AT+WALLET?`, `AT+SELFTEST?`, `AT+ECHO=`; on task start: **`CW+READY,...`** line.
-- **Disabled when `USE_RNG_DUMP=1`:** binary TRNG on the same UART — build without this flag for text CWUP.
+Text CWUP requires **`USE_RNG_DUMP` unset** at build. RX: USART3 (`HAL_UART_Receive_IT`), lines to `\r\n`, **`CWUP`** task, shared TX mutex with logs (`UART_Tx_Lock`). When **`USE_RNG_DUMP=1`**, the same UART carries raw binary TRNG and **`Cwup_Init()`** does not start CWUP (see §11).
+
+| Command / item | Status | Notes |
+|----------------|--------|-------|
+| **`CW+READY,...`** on startup | Implemented | Phase B |
+| **`AT+PING`** | Implemented | `CW+PONG` |
+| **`AT+CWINFO?`** | Implemented | protocol, build |
+| **`AT+READY?`** | Implemented | duplicate `CW+READY` |
+| **`AT+FWINFO?`** | Implemented | `fw_integrity_snprint()` |
+| **`AT+BOOTCHAIN?`** | Implemented | lab, macros + `VTOR` |
+| **`AT+WALLET?`** | Implemented | lab / CI, no secrets |
+| **`AT+SELFTEST?`** | Implemented | FreeRTOS tick |
+| **`AT+ECHO=`** | Implemented | pipeline regression |
+| **`AT+MARKS`** | Not implemented | spec §5 only |
+| **`AT+RNG=START`**, **`AT+RNG=STOP`**, §7 frames | Not implemented | phase D; not the same as raw `USE_RNG_DUMP` |
 
 ## 11. Future (v0.2+)
 
-- `AT+RNG=START` / framed mode B, `AT+MARKS` — not in firmware yet.
-- `CWUP_LEGACY_RAW` for old raw `USE_RNG_DUMP` stream.
+- **`AT+MARKS`** and **framed TRNG** (§7, `AT+RNG=START`) — see §10 table.
+- `CWUP_LEGACY_RAW` idea for old raw `USE_RNG_DUMP` stream (not in firmware).
 
 **Русский:** [UART_PROTOCOL_MVP_ru.md](UART_PROTOCOL_MVP_ru.md)

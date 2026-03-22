@@ -96,6 +96,14 @@ python3 scripts/secure_boot_image.py /path/to/signed_app.bin --privkey-pem ../st
 python3 -m pytest tests/mvp -q
 ```
 
+**Локально как в CI (build job):** после `make` — `fw_integrity_check` + те же pytest:
+
+```bash
+./scripts/ci_host_mvp.sh
+```
+
+В **Gitea** отдельные шаги: `FW integrity — host CRC/size`, затем `MVP host tests (pytest)` (см. `.gitea/workflows/simple-ci.yml`, `cwup-mvp-ci.yml`).
+
 ---
 
 ## WebUSB signing
