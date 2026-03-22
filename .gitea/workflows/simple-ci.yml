@@ -227,9 +227,25 @@ jobs:
           echo "   Timeout: ${CI_UART_BOOT_TIMEOUT_SEC:-120}s  port: ${CI_UART_PORT:-/dev/ttyACM0}"
           echo "⏳ Post-flash pause: ${CI_UART_POST_FLASH_SLEEP_SEC:-4}s"
           sleep "${CI_UART_POST_FLASH_SLEEP_SEC:-4}"
+          set +e
           "$PY" scripts/ci/uart_wait_boot_log.py \
             --markers-file scripts/ci/uart_boot_markers.txt \
             --timeout "${CI_UART_BOOT_TIMEOUT_SEC:-120}"
+          uart_rc=$?
+          set -e
+          if [ "$uart_rc" -ne 0 ]; then
+            echo ""
+            echo "========== UART step failed (exit $uart_rc) — plain-text dump for CI UI =========="
+            echo "--- uart_boot_status.txt ---"
+            cat uart_boot_status.txt 2>/dev/null || true
+            echo "--- uart_output.log (last 120 lines) ---"
+            tail -n 120 uart_output.log 2>/dev/null || true
+            echo "--- uart_output.log size ---"
+            wc -l uart_output.log 2>/dev/null || true
+            wc -c uart_output.log 2>/dev/null || true
+            echo "==================================================================================="
+            exit "$uart_rc"
+          fi
 
       - name: Display log analysis
         if: always()
@@ -241,7 +257,15 @@ jobs:
           fi
           if [ -f uart_output.log ]; then
             echo "=== UART Output ==="
-            cat uart_output.log
+            bytes=$(wc -c < uart_output.log | tr -d ' ')
+            if [ "${bytes:-0}" -gt 200000 ]; then
+              echo "(large log: ${bytes} bytes — head+tail only; full file in artifact uart-logs)"
+              head -n 40 uart_output.log
+              echo "..."
+              tail -n 120 uart_output.log
+            else
+              cat uart_output.log
+            fi
             echo ""
             echo "=== Analysis ==="
             echo "Lines: $(wc -l < uart_output.log)"

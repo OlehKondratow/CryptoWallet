@@ -34,6 +34,15 @@ import time
 from pathlib import Path
 
 
+def _print_fail_banner(msg: str) -> None:
+    """Дублируем ошибку обычным текстом: в UI Gitea строка ::error:: часто обрезается."""
+    line = "=" * 60
+    print(f"\n{line}", flush=True)
+    print("UART BOOT MARKERS — FAILED", flush=True)
+    print(msg, flush=True)
+    print(f"{line}\n", flush=True)
+
+
 def load_markers(path: Path) -> list[str]:
     lines: list[str] = []
     raw = path.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -81,7 +90,9 @@ def main() -> int:
 
     markers_path = Path(args.markers_file)
     if not markers_path.is_file():
-        print(f"::error::Markers file not found: {markers_path.resolve()}", flush=True)
+        m = f"Markers file not found: {markers_path.resolve()}"
+        _print_fail_banner(m)
+        print(f"::error::{m}", flush=True)
         return 1
 
     markers = load_markers(markers_path)
@@ -134,6 +145,7 @@ def main() -> int:
                         f"Timeout after {elapsed:.1f}s waiting for marker {idx + 1}/{len(markers)}: {pending!r}\n"
                         f"--- log tail ---\n{tail}"
                     )
+                    _print_fail_banner(err)
                     print(f"::error::{err}", flush=True)
                     Path(args.log_out).write_text(buffer, encoding="utf-8", errors="replace")
                     Path(args.status_out).write_text(f"FAIL: {err}\n", encoding="utf-8")
@@ -148,6 +160,7 @@ def main() -> int:
                         sys.stdout.write(text)
                         sys.stdout.flush()
                 except OSError as e:
+                    _print_fail_banner(f"UART read error: {e}")
                     print(f"::error::UART read error: {e}", flush=True)
                     Path(args.log_out).write_text(buffer, encoding="utf-8", errors="replace")
                     Path(args.status_out).write_text(f"FAIL: {e}\n", encoding="utf-8")
@@ -178,6 +191,7 @@ def main() -> int:
                     f"Timeout after {elapsed:.1f}s — missing {len(missing)} marker(s): {missing!r}\n"
                     f"--- log tail ---\n{tail}"
                 )
+                _print_fail_banner(err)
                 print(f"::error::{err}", flush=True)
                 Path(args.log_out).write_text(buffer, encoding="utf-8", errors="replace")
                 Path(args.status_out).write_text(f"FAIL: {err}\n", encoding="utf-8")
@@ -192,6 +206,7 @@ def main() -> int:
                     sys.stdout.write(text)
                     sys.stdout.flush()
             except OSError as e:
+                _print_fail_banner(f"UART read error: {e}")
                 print(f"::error::UART read error: {e}", flush=True)
                 Path(args.log_out).write_text(buffer, encoding="utf-8", errors="replace")
                 Path(args.status_out).write_text(f"FAIL: {e}\n", encoding="utf-8")
