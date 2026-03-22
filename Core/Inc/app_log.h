@@ -41,4 +41,12 @@ void App_Log_DbgMsg(const char *msg);
 #define App_Log_DbgMsg(msg) ((void)(msg))
 #endif
 
+/**
+ * @brief Сводные строки «кошелёк» для UART и CI (`scripts/ci/uart_boot_markers.txt`).
+ * @details MAIN — готовность ядра до @c osKernelStart ; остальные — после старта задач.
+ *          Формат: @c [INFO] [WALLET] MAIN ok | @c [INFO] [WALLET] &lt;NAME&gt; info .
+ */
+#define APP_LOG_WALLET_MAIN_OK() APP_LOG_INFO("[WALLET] MAIN ok")
+#define APP_LOG_WALLET_SUB_INFO(name_lit) APP_LOG_INFO("[WALLET] " name_lit " info")
+
 #endif /* APP_LOG_H */

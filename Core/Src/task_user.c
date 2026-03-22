@@ -47,6 +47,7 @@ static void user_task(void *pvParameters)
 
     APP_LOG_INFO("[USER] task started");
     APP_LOG_INFO("[USER] button debounce active");
+    APP_LOG_WALLET_SUB_INFO("USER");
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));

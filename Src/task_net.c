@@ -406,6 +406,7 @@ static void net_task(void *pvParameters)
 
     sys_thread_new("HTTP", http_server_thread, NULL, 16384, 2);  /* 16K stack for HTTP (was 2K, 8x increase) */
     APP_LOG_INFO("[NET] HTTP stack ready");
+    APP_LOG_WALLET_SUB_INFO("NET");
 
 #if LWIP_ALIVE_LOG
     TickType_t last_log = xTaskGetTickCount();

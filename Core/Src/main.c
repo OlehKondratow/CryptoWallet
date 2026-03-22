@@ -185,6 +185,7 @@ int main(void)
     RNG_Dump_Task_Create();
 #endif
     APP_LOG_INFO("[MAIN] tasks created, starting scheduler");
+    APP_LOG_WALLET_MAIN_OK();
 
 #if !SKIP_OLED
     /* OLED already inited in HW_Init (right after I2C). Show startup banner. */

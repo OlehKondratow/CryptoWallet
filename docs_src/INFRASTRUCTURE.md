@@ -540,6 +540,27 @@ http://localhost:3000/admin/CryptoWallet/actions
 ./infra/deploy.sh logs gitea-runner
 ```
 
+### Логи host runner и Cursor / AI-ассистент
+
+**Прямого доступа у ассистента в Cursor к Gitea, act_runner или SSH к хосту нет** — он читает только файлы в открытом workspace и текст, который вы вставили в чат.
+
+Чтобы можно было разбирать падения CI вместе с ассистентом:
+
+1. **Артефакты workflow** — скачайте zip (например `uart-logs`), распакуйте в каталог репозитория:
+   ```bash
+   mkdir -p logs/ci
+   unzip -o ~/Downloads/uart-logs.zip -d logs/ci/
+   ```
+   Каталог `logs/ci/` в **`.gitignore`** — в git не попадёт.
+
+2. **Тот же хост, что и проект** — если runner крутится на машине с `/data/projects/CryptoWallet`, можно после прогона скопировать лог скриптом/cron в `logs/ci/last-uart.log` (путь в workspace должен совпадать с открытым в Cursor).
+
+3. **Журнал службы runner** (на хосте): `journalctl -u gitea-runner -n 200 --no-pager` → сохранить в файл внутри проекта и открыть в IDE.
+
+4. **Локальный act** — перенаправьте вывод: `act ... 2>&1 | tee logs/ci/act-last.txt`.
+
+После этого можно написать в чат: «разбери `logs/ci/uart_output.log`» — файл уже в workspace.
+
 ---
 
 ## Hardware-in-the-Loop тестирование
@@ -559,7 +580,7 @@ Verification:
 
 ### TRNG Data Capture (опционально в pipeline)
 
-Основная сборка в `simple-ci.yml` использует **`USE_RNG_DUMP=0`** (переменная **`CI_BUILD_USE_RNG_DUMP`**, по умолчанию `0`), чтобы на UART шли **текстовые логи** и проходила проверка маркеров из `scripts/ci/uart_boot_markers.txt`. Режим **`USE_RNG_DUMP=1`** отключает обычный UART и заменяет его **бинарным потоком RNG** — тогда строки `[INFO] [MAIN] …` не появятся, а `wc -l` по логу даст ~0 при большом объёме байт.
+Основная сборка в `simple-ci.yml` использует **`USE_RNG_DUMP=0`** (переменная **`CI_BUILD_USE_RNG_DUMP`**, по умолчанию `0`), чтобы на UART шли **текстовые логи** и проходила проверка маркеров из `scripts/ci/uart_boot_markers.txt` (сводка **`[INFO] [WALLET] MAIN ok`** и **`[INFO] [WALLET] … info`** для SIGN, USER, IO, NET, ETH — см. `APP_LOG_WALLET_*` в `Core/Inc/app_log.h`). Скрипт **`scripts/ci/uart_wait_boot_log.py`** по умолчанию считает загрузку успешной, если **все** перечисленные подстроки **хотя бы раз** встретились в логе (**порядок не важен**); строгий порядок — флаг `--ordered` или **`CI_UART_MARKERS_ORDERED=1`**. Режим **`USE_RNG_DUMP=1`** отключает обычный UART и заменяет его **бинарным потоком RNG** — тогда строки `[INFO] [MAIN] …` не появятся, а `wc -l` по логу даст ~0 при большом объёме байт.
 
 Отдельный job `hardware-test` может пытаться захватить RNG через `scripts/capture_rng_uart.py` (`continue-on-error`); для полноценного RNG-режима задайте **`CI_BUILD_USE_RNG_DUMP=1`** в env runner и учтите, что этап **Analyse UART Log** по текстовым маркерам станет недоступен.
 

@@ -1,3 +1,6 @@
+# Локальные копии логов CI / UART с runner (см. docs_src/INFRASTRUCTURE.md)
+logs/ci/
+
 # Build outputs
 build/
 *.o

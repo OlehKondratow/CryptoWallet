@@ -223,7 +223,7 @@ jobs:
           set -euo pipefail
           touch uart_boot_status.txt uart_output.log
           PY="${PY_UART:-python3}"
-          echo "📡 UART: ordered markers from scripts/ci/uart_boot_markers.txt"
+          echo "📡 UART: all service markers from scripts/ci/uart_boot_markers.txt (order irrelevant)"
           echo "   Timeout: ${CI_UART_BOOT_TIMEOUT_SEC:-120}s  port: ${CI_UART_PORT:-/dev/ttyACM0}"
           echo "⏳ Post-flash pause: ${CI_UART_POST_FLASH_SLEEP_SEC:-4}s"
           sleep "${CI_UART_POST_FLASH_SLEEP_SEC:-4}"

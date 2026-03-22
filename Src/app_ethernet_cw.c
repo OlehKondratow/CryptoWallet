@@ -99,6 +99,7 @@ void ethernet_link_status_updated(struct netif *netif)
 
     if (link_up) {
         APP_LOG_INFO("[ETH] Link up");
+        APP_LOG_WALLET_SUB_INFO("ETH");
 #if LWIP_DHCP
         DHCP_state = DHCP_START;
 #else

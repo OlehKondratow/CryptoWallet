@@ -69,6 +69,7 @@ static void io_task(void *pvParameters)
 
     APP_LOG_INFO("[IO] task started");
     APP_LOG_INFO("[IO] LED policy active");
+    APP_LOG_WALLET_SUB_INFO("IO");
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));

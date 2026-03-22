@@ -112,6 +112,7 @@ static void sign_task(void *pvParameters)
     }
     APP_LOG_INFO("[SIGN] task started");
     APP_LOG_INFO("[SIGN] ready");
+    APP_LOG_WALLET_SUB_INFO("SIGN");
 
     for (;;) {
         if (state == SIGNING_IDLE) {
