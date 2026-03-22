@@ -25,6 +25,12 @@ extern UART_HandleTypeDef huart3;
  */
 void UART_Log(const char *msg);
 
+/**
+ * @brief Serialize all USART3 TX (logs, CWUP replies, RNG dump blocks).
+ */
+void UART_Tx_Lock(void);
+void UART_Tx_Unlock(void);
+
 #ifdef USE_LWIP
 /**
  * @brief   Configure MPU regions and caches before @c HAL_Init() for Ethernet/DMA safety.

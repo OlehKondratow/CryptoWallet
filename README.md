@@ -708,6 +708,12 @@ python3 -m serial.tools.miniterm /dev/ttyACM0 115200 --raw
 
 ## 🔗 Related Documentation
 
+**Security & testing (overview, RU):**
+- [`docs_src/SECURITY_AND_TESTING_RU.md`](docs_src/SECURITY_AND_TESTING_RU.md) — boot chain, FW integrity (`fw_integrity`), CWUP, RNG, CI (сводка и ссылки)
+
+**HTTP API (Ethernet):**
+- [`docs_src/HTTP_API_ru.md`](docs_src/HTTP_API_ru.md) — `/ping`, `POST /tx`, `GET /tx/signed` (порт 80)
+
 **Comprehensive Analysis & Comparison:**
 - [`docs_src/analysis/PROJECTS_COMPARISON_AND_UPDATES.md`](docs_src/analysis/PROJECTS_COMPARISON_AND_UPDATES.md) - Full stm32_secure_boot vs CryptoWallet comparison
 - [`docs_src/analysis/ARCHITECTURE_DETAILED.md`](docs_src/analysis/ARCHITECTURE_DETAILED.md) - Complete system architecture

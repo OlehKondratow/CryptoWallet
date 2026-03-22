@@ -10,15 +10,14 @@
  *
  *          **Architecture:**
  *          - RNG_Dump_Task: FreeRTOS task that generates and outputs RNG data
- *          - Buffer-based approach to avoid blocking
- *          - Replaces normal UART logging
+ *          - Other tasks may still log to the same UART — stream can mix binary and text
+ *            (bad for dieharder purity; CI skips text markers when USE_RNG_DUMP=1)
  *
  *          **Usage:**
  *          - Build with: make USE_RNG_DUMP=1
  *          - Flash to device: make flash
  *          - Capture on PC: python3 scripts/capture_rng_uart.py --out rng.bin --bytes ...
- *          - CI: main pipeline uses CI_BUILD_USE_RNG_DUMP=0 by default (text UART for boot
- *            markers). RNG capture job needs a firmware built with USE_RNG_DUMP=1 on the board.
+ *          - CI: see docs_src/CI_PIPELINE_ru.md — default build uses USE_RNG_DUMP=1 for TRNG capture.
  *          - Test: dieharder -a -g 201 -f rng.bin
  ******************************************************************************
  */
@@ -30,6 +29,7 @@
 #include "stm32h7xx_hal.h"
 #include "stm32h7xx_hal_rng.h"
 #include "crypto_wallet.h"
+#include "hw_init.h"
 
 #ifdef USE_RNG_DUMP
 
@@ -61,8 +61,10 @@ void RNG_Dump_Task(void *pvParameters)
             memcpy(rng_buffer + i, &rng_val, n);
         }
         
-        /* Transmit buffer to UART3 */
-        HAL_UART_Transmit(&huart3, rng_buffer, sizeof(rng_buffer), 1000);
+        /* Transmit buffer to UART3 (same mutex as logs / CWUP TX) */
+        UART_Tx_Lock();
+        (void)HAL_UART_Transmit(&huart3, rng_buffer, sizeof(rng_buffer), 1000);
+        UART_Tx_Unlock();
         
         /* Small delay to prevent CPU saturation and allow other tasks */
         vTaskDelay(pdMS_TO_TICKS(10));

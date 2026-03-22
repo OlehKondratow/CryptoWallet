@@ -8,6 +8,8 @@
 
 <brief>The `task_net` module is the network facade of the application: it brings up LwIP/Ethernet, starts an HTTP server on port 80, parses JSON/form POST requests (`POST /tx`), validates transactions, and sends them for signing via `g_tx_queue`.</brief>
 
+**HTTP API specification:** [HTTP_API_ru.md](HTTP_API_ru.md) / [HTTP_API_en.md](HTTP_API_en.md)
+
 ## Overview
 
 The `task_net` module is the entry point for all external signing requests: a host (PC, mobile, web interface) connects via Ethernet, sends JSON or form data with address/amount/currency, and the module parses, validates, shows on SSD1306, and queues for the signing task. Without LwIP (`USE_LWIP=0`), the module is a no-op. Business role: be the "gateway to the microcontroller" for the network client.

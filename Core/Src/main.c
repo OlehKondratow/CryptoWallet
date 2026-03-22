@@ -31,6 +31,7 @@
 
 #include "main.h"
 #include "hw_init.h"
+#include "fw_integrity.h"
 #include "app_log.h"
 #include "time_service.h"
 #include "wallet_shared.h"
@@ -44,6 +45,8 @@
 #endif
 #ifdef USE_RNG_DUMP
 #include "rng_dump.h"
+#else
+#include "cwup_uart.h"
 #endif
 #ifndef SKIP_OLED
 #define SKIP_OLED 0
@@ -139,6 +142,13 @@ int main(void)
     HW_Init_Early_LwIP();
     HAL_Init();
     HW_Init();
+    fw_integrity_init();
+    {
+        char fwbuf[112];
+        if (fw_integrity_snprint(fwbuf, sizeof(fwbuf)) > 0) {
+            App_Log_InfoMsg(fwbuf);
+        }
+    }
 
     time_service_init();
 #ifdef USE_CRYPTO_SIGN
@@ -183,6 +193,8 @@ int main(void)
     Task_User_Create();
 #ifdef USE_RNG_DUMP
     RNG_Dump_Task_Create();
+#else
+    Cwup_Init();
 #endif
     APP_LOG_INFO("[MAIN] tasks created, starting scheduler");
     APP_LOG_WALLET_MAIN_OK();

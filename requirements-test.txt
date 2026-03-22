@@ -20,3 +20,6 @@ black>=24.0,<25           # Code formatter
 flake8>=7.0,<8            # Linter
 pytest>=7.0,<8            # Unit testing framework
 
+# stm32_secure_boot signed-image host checks (tests/mvp/test_secure_boot_sign_tamper.py)
+ecdsa>=0.18,<1
+

@@ -70,6 +70,34 @@ python3 scripts/bootloader_secure_signing_test.py --elf-audit-only --no-build --
 
 ---
 
+## MVP: CWUP UART (HIL) + host unit tests
+
+**`test_cwup_mvp.py`** — после загрузки прошивки **без** `USE_RNG_DUMP` ждёт `CW+READY`, затем в каждом раунде: `AT+PING`, `AT+CWINFO?`, `AT+READY?`, **`AT+WALLET?` / `AT+SELFTEST?` / `AT+ECHO=`** (лаборатория, без аутентификации), опционально `AT+FWINFO?` (с `--bin`), `AT+BOOTCHAIN?`. Ожидания для `AT+WALLET?`: `--expect-wallet-seed` / `--expect-crypto-sign` или env `CWUP_EXPECT_WALLET_SEED`, `CWUP_EXPECT_CRYPTO_SIGN`. Параметр **`--stress-extra-rounds N`** повторяет полную последовательность ещё N раз (нагрузка на очередь CWUP). Опционально `--bin build/cryptowallet.bin`: сверка CRC с файлом (как `fw_integrity_check.py`).
+
+```bash
+pip install pyserial   # или venv из раздела выше
+python3 scripts/test_cwup_mvp.py --port /dev/ttyACM0
+python3 scripts/test_cwup_mvp.py --port /dev/ttyACM0 --bin build/cryptowallet.bin
+python3 scripts/test_cwup_mvp.py --port /dev/ttyACM0 --stress-extra-rounds 200 --stress-delay-ms 2
+# В CI без платы:
+CWUP_SKIP_NO_DEVICE=1 python3 scripts/test_cwup_mvp.py
+```
+
+**`secure_boot_image.py`** — разбор и проверка на ПК подписанного **app**-образа в формате **`stm32_secure_boot`** (`sign_image.py`, ECDSA secp256k1, не X.509). Юнит-тесты микропорчи: `tests/mvp/test_secure_boot_sign_tamper.py` (зависимость `ecdsa`).
+
+```bash
+.venv-test/bin/pip install -r requirements-test.txt
+python3 scripts/secure_boot_image.py /path/to/signed_app.bin --privkey-pem ../stm32_secure_boot/scripts/root_private_key.pem
+```
+
+**Юнит-тесты (pytest):** из корня репозитория, с `pytest` из `requirements-test.txt` / `.venv-test`:
+
+```bash
+python3 -m pytest tests/mvp -q
+```
+
+---
+
 ## WebUSB signing
 
 **`test_usb_sign.py`** — see file docstring; needs **pyusb** and udev rules (`udev/99-cryptowallet-webusb.rules`).
@@ -101,6 +129,9 @@ python3 scripts/run_dieharder.py --list-tests
 
 | Script | Role |
 |--------|------|
+| `test_cwup_mvp.py` | CWUP HIL: PING/CWINFO/READY/FWINFO/BOOTCHAIN, stress rounds |
+| `mvp_cwup.py` | Helpers for CWUP parsing (used by tests) |
+| `secure_boot_image.py` | Parse/verify stm32_secure_boot signed `.bin` on host |
 | `bootloader_secure_signing_test.py` | Build, flash, HTTP/WebUSB signing smoke test |
 | `test_usb_sign.py` | WebUSB ping / sign |
 | `test_plan_signing_rng.py` | Generate test plan + DIEHARDER checklist |

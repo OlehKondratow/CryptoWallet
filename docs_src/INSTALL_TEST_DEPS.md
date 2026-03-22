@@ -202,6 +202,13 @@ python3 scripts/test_rng_signing_comprehensive.py --mode rng
 
 For full testing instructions, see `docs_src/TESTING_GUIDE_RNG_SIGNING.md`.
 
+## Gitea Actions / CI (TRNG, UART)
+
+Кратко: **`.gitea/workflows/simple-ci.yml`** — по умолчанию **`USE_RNG_DUMP=1`** (бинарный TRNG на UART), захват RNG в pipeline включён; текстовые маркеры загрузки в этом режиме не ждутся.
+
+Подробная таблица режимов и переменные: **[CI_PIPELINE_ru.md](CI_PIPELINE_ru.md)** | **[CI_PIPELINE_en.md](CI_PIPELINE_en.md)**.  
+Runner: **[INFRASTRUCTURE.md](INFRASTRUCTURE.md)**.
+
 ## Dependency Versions
 
 See `requirements-test-lock.txt` for the exact versions used in the last successful test run.

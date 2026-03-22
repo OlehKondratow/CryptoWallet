@@ -25,6 +25,8 @@
 USE_LWIP ?= 1
 
 TOP         ?= $(CURDIR)
+CW_GIT_DESC ?= $(shell git -C $(TOP) describe --always --dirty 2>/dev/null || echo unknown)
+CFLAGS      += -DCW_GIT_VERSION=\"$(CW_GIT_DESC)\"
 TREZOR_CRYPTO ?= $(abspath $(TOP)/ThirdParty/trezor-crypto)
 # Sibling repos: ../stm32_secure_boot, ../STM32CubeH7, ../stm32-ssd1306.
 # act_runner checkout is often under ~/.cache/act/.../hostexecutor — ../stm32_secure_boot does not exist.
@@ -214,7 +216,7 @@ CRYPTO_OBJ += $(BUILD)/trezor_bip39.o $(BUILD)/trezor_bip32.o $(BUILD)/trezor_ec
       $(BUILD)/trezor_ed25519_basepoint.o $(BUILD)/trezor_ed25519_32bit_tables.o $(BUILD)/trezor_ed25519_impl.o \
       $(BUILD)/trezor_curve25519_scalarmult.o
 endif
-OBJ_MINIMAL_LWIP = $(BUILD)/main.o $(BUILD)/app_log.o $(BUILD)/hw_init.o $(BUILD)/memzero.o $(BUILD)/stm32h7xx_hal_msp.o $(BUILD)/fault_report.o $(BUILD)/stm32h7xx_it_lwip.o $(BUILD)/stm32h7xx_it_systick.o \
+OBJ_MINIMAL_LWIP = $(BUILD)/main.o $(BUILD)/app_log.o $(BUILD)/hw_init.o $(BUILD)/fw_integrity.o $(BUILD)/cwup_uart.o $(BUILD)/cwup_wallet_probe.o $(BUILD)/memzero.o $(BUILD)/stm32h7xx_hal_msp.o $(BUILD)/fault_report.o $(BUILD)/stm32h7xx_it_lwip.o $(BUILD)/stm32h7xx_it_systick.o \
       $(BUILD)/task_display_minimal.o $(BUILD)/task_net.o $(BUILD)/task_sign.o $(BUILD)/task_io.o $(BUILD)/task_user.o $(BUILD)/tx_request_validate.o $(BUILD)/time_service.o \
       $(CRYPTO_OBJ) \
       $(BUILD)/startup_minimal_lwip.o $(BUILD)/system_minimal_lwip.o $(BUILD)/stm32h7xx_hal_timebase_tim.o \
@@ -295,6 +297,15 @@ $(BUILD)/main.o: $(TOP)/Core/Src/main.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/app_log.o: $(TOP)/Core/Src/app_log.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/fw_integrity.o: $(TOP)/Core/Src/fw_integrity.c | $(BUILD)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(BUILD)/cwup_uart.o: $(TOP)/Core/Src/cwup_uart.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+$(BUILD)/cwup_wallet_probe.o: $(TOP)/Core/Src/cwup_wallet_probe.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+
 $(BUILD)/hw_init.o: $(TOP)/Core/Src/hw_init.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/time_service.o: $(TOP)/Core/Src/time_service.c | $(BUILD)

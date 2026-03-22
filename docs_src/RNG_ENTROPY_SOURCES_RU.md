@@ -35,8 +35,8 @@
 5. **Одним шагом (лаборатория)**  
    `./scripts/run_full_rng_verification.sh` — захват + анализ + dieharder (см. `TESTING_GUIDE_RNG_SIGNING.md`).
 
-6. **CI**  
-   Для прошивки с `CI_BUILD_USE_RNG_DUMP=1` задайте переменную на runner и пересоберите; иначе захват по UART не даст бинарного потока.
+6. **CI (Gitea)**  
+   По умолчанию **`USE_RNG_DUMP=1`** в `.gitea/workflows/simple-ci.yml` — см. **[CI_PIPELINE_ru.md](CI_PIPELINE_ru.md)**.
 
 ## Сравнение с Trezor (концептуально)
 

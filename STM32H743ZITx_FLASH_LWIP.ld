@@ -67,6 +67,8 @@ SECTIONS
   } > ROM
 
   _sidata = LOADADDR(.data);
+  /* Bounds of programmed application in Flash (vector + code/rodata + .data init LMA) — fw_integrity.c */
+  PROVIDE(__app_flash_start = ORIGIN(ROM));
   .data : {
     . = ALIGN(4);
     _sdata = .;
@@ -77,6 +79,8 @@ SECTIONS
     . = ALIGN(4);
     _edata = .;
   } > RAM_D1 AT > ROM
+
+  PROVIDE(__app_flash_end = ALIGN(LOADADDR(.data) + SIZEOF(.data), 4));
 
   . = ALIGN(4);
   .bss : {

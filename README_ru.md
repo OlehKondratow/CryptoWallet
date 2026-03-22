@@ -714,6 +714,7 @@ task_user.c
 - [`docs_src/analysis/PROJECTS_COMPARISON_AND_UPDATES_ru.md`](docs_src/analysis/PROJECTS_COMPARISON_AND_UPDATES_ru.md) - Полное сравнение stm32_secure_boot vs CryptoWallet
 - [`docs_src/analysis/ARCHITECTURE_DETAILED_ru.md`](docs_src/analysis/ARCHITECTURE_DETAILED_ru.md) - Полная архитектура системы
 - [`docs_src/analysis/QUICK_REFERENCE_ru.md`](docs_src/analysis/QUICK_REFERENCE_ru.md) - Команды и устранение неполадок
+- [`docs_src/CI_PIPELINE_ru.md`](docs_src/CI_PIPELINE_ru.md) — pipeline Gitea, TRNG на UART ([English](docs_src/CI_PIPELINE_en.md))
 
 **Документация модулей:**
 - [`docs_src/README.md`](docs_src/README.md) - Полный индекс всех модулей с иерархической навигацией

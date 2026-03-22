@@ -578,23 +578,13 @@ Verification:
   $ ls -la /dev/ttyACM0           # UART port
 ```
 
-### TRNG Data Capture (опционально в pipeline)
+### CI: TRNG на UART и pipeline
 
-Основная сборка в `simple-ci.yml` использует **`USE_RNG_DUMP=0`** (переменная **`CI_BUILD_USE_RNG_DUMP`**, по умолчанию `0`), чтобы на UART шли **текстовые логи** и проходила проверка маркеров из `scripts/ci/uart_boot_markers.txt` (сводка **`[INFO] [WALLET] MAIN ok`** и **`[INFO] [WALLET] … info`** для SIGN, USER, IO, NET, ETH — см. `APP_LOG_WALLET_*` в `Core/Inc/app_log.h`). Скрипт **`scripts/ci/uart_wait_boot_log.py`** по умолчанию считает загрузку успешной, если **все** перечисленные подстроки **хотя бы раз** встретились в логе (**порядок не важен**); строгий порядок — флаг `--ordered` или **`CI_UART_MARKERS_ORDERED=1`**. По умолчанию **`CI_UART_ST_FLASH_RESET=1`**: **`st-flash reset`** выполняется **после** `open(serial)`, иначе ранние строки (`MAIN ok`, IO, NET, …) успевают уйти до открытия порта. Режим **`USE_RNG_DUMP=1`** отключает обычный UART и заменяет его **бинарным потоком RNG** — тогда строки `[INFO] [MAIN] …` не появятся, а `wc -l` по логу даст ~0 при большом объёме байт.
+**По умолчанию** в `simple-ci.yml` **`CI_BUILD_USE_RNG_DUMP=1`**: сборка с **`USE_RNG_DUMP=1`**, UART — **бинарный поток TRNG**; job **Analyse UART Log** не ждёт строки из `uart_boot_markers.txt` (см. **`docs_src/CI_PIPELINE_ru.md`** / **`CI_PIPELINE_en.md`**).
 
-Отдельный job `hardware-test` может пытаться захватить RNG через `scripts/capture_rng_uart.py` (`continue-on-error`); для полноценного RNG-режима задайте **`CI_BUILD_USE_RNG_DUMP=1`** в env runner и учтите, что этап **Analyse UART Log** по текстовым маркерам станет недоступен.
+Режим **текстовых маркеров** `[WALLET]`: ручной запуск workflow → **`ci_build_use_rng_dump` = `0`**, либо переменная окружения на runner. Тогда **`scripts/ci/uart_wait_boot_log.py`** проверяет маркеры (порядок не важен; **`CI_UART_ST_FLASH_RESET=1`**: `st-flash reset` после `open(serial)`), а шаг RNG capture **пропускается**, если не задан **`CI_RNG_UART_CAPTURE_FORCE=1`**.
 
-**Локальное тестирование:**
-```bash
-# Захватить RNG данные
-python3 scripts/test_rng_signing_comprehensive.py --mode rng
-
-# Запустить Dieharder
-dieharder -f rng.bin -a
-
-# Проверить подписи
-python3 scripts/test_rng_signing_comprehensive.py --mode signing
-```
+**Локально:** `scripts/capture_rng_uart.py`, `scripts/test_rng_signing_comprehensive.py`, `docs_src/TESTING_GUIDE_RNG_SIGNING.md`.
 
 ### Результаты Dieharder
 

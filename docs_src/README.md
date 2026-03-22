@@ -12,6 +12,18 @@
 
 При необходимости для модулей вне `Core/` используется имя файла без пути, например `docs_src/task_net.md` для `Src/task_net.c`.
 
+## CI и инфраструктура
+
+| Документ | Описание |
+|----------|---------|
+| [SECURITY_AND_TESTING_RU.md](SECURITY_AND_TESTING_RU.md) | **Сводка:** безопасность, целостность FW, CWUP, RNG, CI |
+| [SECURITY_AND_TESTING_EN.md](SECURITY_AND_TESTING_EN.md) | Same (English short overview) |
+| [CI_PIPELINE_ru.md](CI_PIPELINE_ru.md) | Gitea Actions: сборка с TRNG на UART (`USE_RNG_DUMP`), jobs |
+| [CI_PIPELINE_en.md](CI_PIPELINE_en.md) | Same (English) |
+| [UART_PROTOCOL_MVP_ru.md](UART_PROTOCOL_MVP_ru.md) | CWUP-0.1: UART команды + кадры TRNG (MVP) |
+| [UART_PROTOCOL_MVP_en.md](UART_PROTOCOL_MVP_en.md) | Same (English) |
+| [INFRASTRUCTURE.md](INFRASTRUCTURE.md) | Runner, железо, зависимости сборки |
+
 ## Оглавление
 
 ### Инициализация и нижний уровень
@@ -33,6 +45,8 @@
 
 | Документ | Описание |
 |----------|---------|
+| [HTTP_API_ru.md](HTTP_API_ru.md) | Спецификация HTTP: `/ping`, `/`, `POST /tx`, `GET /tx/signed` |
+| [HTTP_API_en.md](HTTP_API_en.md) | Same (English) |
 | [task_net.md](task_net.md) | LwIP + HTTP server (PORT 80): парсинг /tx, валидация, очередь подписания |
 | [app_ethernet_cw.md](app_ethernet_cw.md) | Ethernet link FSM, DHCP, LED feedback |
 

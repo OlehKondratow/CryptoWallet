@@ -5,7 +5,7 @@
 **Версия:** 1.0  
 **Статус:** ✅ Готов к использованию
 
-**См. также:** [RNG_ENTROPY_SOURCES_RU.md](RNG_ENTROPY_SOURCES_RU.md) — источники энтропии; [RNG_THREAT_MODEL_P2_RU.md](RNG_THREAT_MODEL_P2_RU.md) — модель угроз и практики (P2).
+**См. также:** [CI_PIPELINE_ru.md](CI_PIPELINE_ru.md) / [CI_PIPELINE_en.md](CI_PIPELINE_en.md) — pipeline и TRNG в CI; [RNG_ENTROPY_SOURCES_RU.md](RNG_ENTROPY_SOURCES_RU.md); [RNG_THREAT_MODEL_P2_RU.md](RNG_THREAT_MODEL_P2_RU.md) (P2).
 
 ---
 

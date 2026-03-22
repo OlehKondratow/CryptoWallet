@@ -28,6 +28,19 @@ on:
     branches: [ main, develop ]
   pull_request:
   workflow_dispatch:
+    inputs:
+      ci_build_use_rng_dump:
+        description: '1 = USE_RNG_DUMP (бинарный TRNG на UART, как в push/PR). 0 = текстовые [WALLET]-маркеры, без ожидания RNG-capture.'
+        type: choice
+        options:
+          - '1'
+          - '0'
+        default: '1'
+
+# Очередь доступа к ST-LINK/UART между workflow (см. cwup-mvp-ci.yml).
+concurrency:
+  group: cryptowallet-stlink-${{ github.repository }}
+  cancel-in-progress: false
 
 env:
   # Python: false = только проверка импортов; true = pip/venv как в шагах ниже
@@ -40,8 +53,8 @@ env:
   # иначе теряются ранние строки [WALLET] MAIN ok / IO / NET / …
   CI_UART_BOOT_TIMEOUT_SEC: '120'
   CI_UART_ST_FLASH_RESET: '1'
-  # Сборка для UART-маркеров: НЕ включать USE_RNG_DUMP (иначе UART — только бинарный RNG, без [INFO] строк)
-  CI_BUILD_USE_RNG_DUMP: '0'
+  # По умолчанию USE_RNG_DUMP=1 (TRNG на UART для CI). Ручной запуск: inputs.ci_build_use_rng_dump (0 = текстовые маркеры).
+  CI_BUILD_USE_RNG_DUMP: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ci_build_use_rng_dump || '1' }}
   # scripts/capture_rng_uart.py: таймауты и прогресс (см. --help / CI_RNG_* в скрипте)
   CI_RNG_FIRST_BYTE_TIMEOUT_SEC: '90'
   CI_RNG_STALL_TIMEOUT_SEC: '180'
@@ -53,6 +66,18 @@ env:
   CI_RNG_DIEHARDER_FULL: '0'
   # Пропустить долгий RNG-шаг (например прошивка без USE_RNG_DUMP=1): CI_SKIP_RNG_UART_CAPTURE=1
   CI_SKIP_RNG_UART_CAPTURE: '0'
+  # Если CI_BUILD_USE_RNG_DUMP=0, шаг захвата RNG автоматически пропускается (exit 0), иначе 90s таймаут и «failure».
+  # Принудительно запустить захват при несовпадении сборки (например вручную прошили RNG-сборку): CI_RNG_UART_CAPTURE_FORCE=1
+  CI_RNG_UART_CAPTURE_FORCE: '0'
+  # MVP: pytest tests/mvp в job build (хост, pytest+ecdsa)
+  # CWUP HIL: scripts/test_cwup_mvp.py в analyse-log при CI_BUILD_USE_RNG_DUMP=0 (иначе CWUP в прошивке нет)
+  CI_CWUP_STRESS_ROUNDS: '5'
+  CI_CWUP_READY_TIMEOUT_SEC: '45'
+  # 1 = нет порта → exit 0 (как CI_UART_SKIP_NO_DEVICE); 0 = строгий HIL при наличии /dev/ttyACM0
+  CI_CWUP_SKIP_NO_DEVICE: '1'
+  # Ожидаемые флаги AT+WALLET? (сборка Simple CI без USE_TEST_SEED → 0,0)
+  CI_CWUP_EXPECT_WALLET_SEED: '0'
+  CI_CWUP_EXPECT_CRYPTO_SIGN: '0'
 
 # Явно bash для всех шагов `run:` (как в интерактивной shell).
 defaults:
@@ -146,13 +171,25 @@ jobs:
           [ -n "${CI_FIRMWARE_SSD1306:-}" ] && export SSD1306="$CI_FIRMWARE_SSD1306"
           echo "CRYPTO_DEPS_ROOT=$CRYPTO_DEPS_ROOT (Makefile uses this for SECURE_BOOT/CUBE_ROOT/SSD1306)"
           make clean
-          # Должно совпадать с CI_BUILD_USE_RNG_DUMP: 1 = бинарный RNG на UART (маркеры [WALLET] не появятся)
-          RNG="${CI_BUILD_USE_RNG_DUMP:-0}"
-          echo "🔧 USE_RNG_DUMP=$RNG (0 = текстовые логи для uart_boot_markers.txt, 1 = RNG dump)"
+          # CI_BUILD_USE_RNG_DUMP: 1 = бинарный TRNG на UART (дефолт CI); 0 = текстовые маркеры
+          RNG="${CI_BUILD_USE_RNG_DUMP:-1}"
+          echo "🔧 USE_RNG_DUMP=$RNG"
           make "USE_RNG_DUMP=$RNG" -j"$(nproc)"
           echo ""
           echo "✅ Build complete:"
           ls -lh build/cryptowallet.bin build/cryptowallet.elf
+
+      - name: MVP host tests (pytest tests/mvp)
+        run: |
+          set -euo pipefail
+          echo "🧪 MVP host tests: CRC, CWUP parsing, secure_boot image tamper (ecdsa)"
+          python3 -m venv .venv-ci-mvp
+          .venv-ci-mvp/bin/pip install -q -U pip
+          .venv-ci-mvp/bin/pip install -q pytest "ecdsa>=0.18,<1"
+          export STM32_SECURE_BOOT="${CI_FIRMWARE_SECURE_BOOT:-${CRYPTO_DEPS_ROOT:-/data/projects}/stm32_secure_boot}"
+          echo "STM32_SECURE_BOOT=$STM32_SECURE_BOOT (for test_secure_boot_sign_tamper if key present)"
+          .venv-ci-mvp/bin/python -m pytest tests/mvp -q --tb=short
+          echo "✅ MVP pytest OK"
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v3
@@ -210,6 +247,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
+      - name: Download firmware (CWUP --bin vs build/cryptowallet.bin)
+        uses: actions/download-artifact@v3
+        with:
+          name: firmware-build
+          path: build/
+
       - name: Setup Python (pyserial — без PEP 668 pip на системный Python)
         run: |
           set -euo pipefail
@@ -237,6 +280,12 @@ jobs:
         run: |
           set -euo pipefail
           touch uart_boot_status.txt uart_output.log
+          if [ "${CI_BUILD_USE_RNG_DUMP:-1}" = "1" ]; then
+            echo "⏭️  USE_RNG_DUMP=1: UART — бинарный поток TRNG; текстовые маркеры [WALLET] не ожидаются (см. docs_src/CI_PIPELINE_ru.md)."
+            echo "skipped: rng_dump_mode CI_BUILD_USE_RNG_DUMP=1" > uart_boot_status.txt
+            echo "(UART binary TRNG stream — no text boot log)" > uart_output.log
+            exit 0
+          fi
           PY="${PY_UART:-python3}"
           echo "📡 UART: all service markers from scripts/ci/uart_boot_markers.txt (order irrelevant)"
           echo "   Timeout: ${CI_UART_BOOT_TIMEOUT_SEC:-120}s  port: ${CI_UART_PORT:-/dev/ttyACM0}"
@@ -260,6 +309,32 @@ jobs:
             echo "==================================================================================="
             exit "$uart_rc"
           fi
+
+      - name: MVP CWUP HIL (UART, only when USE_RNG_DUMP=0)
+        run: |
+          set -euo pipefail
+          if [ "${CI_BUILD_USE_RNG_DUMP:-1}" = "1" ]; then
+            echo "⏭️  USE_RNG_DUMP=1: CWUP task not active — skip scripts/test_cwup_mvp.py (see cwup_uart.c / UART_PROTOCOL_MVP)"
+            exit 0
+          fi
+          if [ ! -f build/cryptowallet.bin ]; then
+            echo "::warning::build/cryptowallet.bin missing — skip CWUP HIL"
+            exit 0
+          fi
+          echo "📡 MVP CWUP HIL: WALLET/SELFTEST/ECHO + PING… FWINFO+CRC / BOOTCHAIN + stress"
+          python3 -m venv .venv-ci-cwup
+          .venv-ci-cwup/bin/pip install -q -U pip pyserial
+          PY="$(pwd)/.venv-ci-cwup/bin/python3"
+          export CWUP_SKIP_NO_DEVICE="${CI_CWUP_SKIP_NO_DEVICE:-1}"
+          export CWUP_UART_PORT="${CI_UART_PORT:-/dev/ttyACM0}"
+          export CWUP_EXPECT_WALLET_SEED="${CI_CWUP_EXPECT_WALLET_SEED:-0}"
+          export CWUP_EXPECT_CRYPTO_SIGN="${CI_CWUP_EXPECT_CRYPTO_SIGN:-0}"
+          "$PY" scripts/test_cwup_mvp.py \
+            --port "${CWUP_UART_PORT}" \
+            --bin build/cryptowallet.bin \
+            --stress-extra-rounds "${CI_CWUP_STRESS_ROUNDS:-5}" \
+            --ready-timeout "${CI_CWUP_READY_TIMEOUT_SEC:-45}"
+          echo "✅ CWUP HIL OK"
 
       - name: Display log analysis
         if: always()
@@ -425,14 +500,19 @@ jobs:
           set -euo pipefail
           echo "═══════════════════════════════════════════════════════════════════"
           echo "🧪 RNG UART capture (scripts/capture_rng_uart.py)"
-          echo "   Ожидается бинарный поток с МК (USE_RNG_DUMP=1 в прошивке)."
-          echo "   В этом pipeline сборка по умолчанию: CI_BUILD_USE_RNG_DUMP=0 → на UART"
-          echo "   обычно текстовые логи; тогда захват прервётся по таймауту первого байта"
-          echo "   (${CI_RNG_FIRST_BYTE_TIMEOUT_SEC:-90}s) — это ожидаемо, пока не прошьёте RNG-сборку."
-          echo "   Пропуск шага: CI_SKIP_RNG_UART_CAPTURE=1 на runner."
+          echo "   Прошивка: USE_RNG_DUMP=${CI_BUILD_USE_RNG_DUMP:-1} (1 = бинарный TRNG на UART)."
+          echo "   Пропуск capture: CI_SKIP_RNG_UART_CAPTURE=1 или CI_BUILD_USE_RNG_DUMP≠1 (без CI_RNG_UART_CAPTURE_FORCE=1)."
+          echo "   Док: docs_src/CI_PIPELINE_ru.md"
           echo "═══════════════════════════════════════════════════════════════════"
           if [ "${CI_SKIP_RNG_UART_CAPTURE:-0}" = "1" ]; then
             echo "⏭️  CI_SKIP_RNG_UART_CAPTURE=1 — пропуск захвата RNG"
+            : > rng_test.bin
+            ls -la rng_test.bin
+            exit 0
+          fi
+          if [ "${CI_BUILD_USE_RNG_DUMP:-0}" != "1" ] && [ "${CI_RNG_UART_CAPTURE_FORCE:-0}" != "1" ]; then
+            echo "⏭️  Пропуск RNG capture: CI_BUILD_USE_RNG_DUMP≠1 (ожидаемо для сборки с текстовыми логами на UART)."
+            echo "    Чтобы тестировать бинарный поток: CI_BUILD_USE_RNG_DUMP=1 + прошивка с USE_RNG_DUMP=1."
             : > rng_test.bin
             ls -la rng_test.bin
             exit 0
@@ -545,7 +625,7 @@ jobs:
           
           1️⃣  BUILD
               Status: ${{ needs.build.result }}
-              Task: Compile firmware using ARM GCC toolchain
+              Task: Compile firmware using ARM GCC toolchain; MVP pytest (tests/mvp — host CRC/CWUP parse/secure_boot tamper)
               Output: cryptowallet.bin, cryptowallet.elf
           
           2️⃣  FLASH & RESET
@@ -556,8 +636,7 @@ jobs:
           
           3️⃣  ANALYSE LOG
               Status: ${{ needs.analyse-log.result }}
-              Task: Read UART output after reset
-              Duration: 5 seconds
+              Task: Text boot markers OR skip if USE_RNG_DUMP=1 (binary TRNG UART); MVP CWUP HIL if USE_RNG_DUMP=0 (test_cwup_mvp.py)
               Port: /dev/ttyACM0 @ 115200 baud
           
           4️⃣  QUICK TEST
@@ -590,7 +669,7 @@ jobs:
           - Stages 2-5 require STM32H743ZI2 device + ST-LINK debugger
           - Stage 1 (Build) always works in CI environment
           - UART tests require /dev/ttyACM0 to be available
-          - RNG capture requires firmware running on device (5-30 min)
+          - Default build: USE_RNG_DUMP=1 (TRNG on UART); marker step skipped when binary UART
           
           Next Steps:
           ───────────

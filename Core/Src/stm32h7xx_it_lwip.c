@@ -9,11 +9,18 @@
  */
 
 #include "stm32h7xx_hal.h"
+#include "stm32h7xx_hal_uart.h"
 #include "main.h"
 
 extern ETH_HandleTypeDef EthHandle;
+extern UART_HandleTypeDef huart3;
 
 void ETH_IRQHandler(void)
 {
     HAL_ETH_IRQHandler(&EthHandle);
+}
+
+void USART3_IRQHandler(void)
+{
+    HAL_UART_IRQHandler(&huart3);
 }

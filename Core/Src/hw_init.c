@@ -279,6 +279,20 @@ static void MX_USART3_Init(void)
     }
 }
 
+void UART_Tx_Lock(void)
+{
+    if (s_uart_log_mutex != NULL && xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        (void)xSemaphoreTake(s_uart_log_mutex, pdMS_TO_TICKS(500));
+    }
+}
+
+void UART_Tx_Unlock(void)
+{
+    if (s_uart_log_mutex != NULL && xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        (void)xSemaphoreGive(s_uart_log_mutex);
+    }
+}
+
 void UART_Log(const char *msg)
 {
     if (msg == NULL || huart3.Instance == NULL) return;
@@ -286,12 +300,7 @@ void UART_Log(const char *msg)
     while (msg[n] != '\0' && n < 256) n++;
     if (n == 0) return;
 
-    /* Только при работающем планировщике — до osKernelStart вызовы идут из main, гонки нет */
-    if (s_uart_log_mutex != NULL && xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        (void)xSemaphoreTake(s_uart_log_mutex, pdMS_TO_TICKS(200));
-    }
+    UART_Tx_Lock();
     HAL_UART_Transmit(&huart3, (const uint8_t *)msg, (uint16_t)n, 500);
-    if (s_uart_log_mutex != NULL && xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
-        (void)xSemaphoreGive(s_uart_log_mutex);
-    }
+    UART_Tx_Unlock();
 }
