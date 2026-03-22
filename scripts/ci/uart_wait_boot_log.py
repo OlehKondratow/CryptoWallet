@@ -21,6 +21,9 @@
   CI_UART_SKIP_NO_DEVICE    — если 1 и порта нет: выход 0 (пропуск)
   CI_UART_STRICT_NO_DEVICE  — если 1 и порта нет: выход 2
   CI_UART_MARKERS_ORDERED   — если 1: требовать порядок как в файле (legacy)
+  CI_UART_ST_FLASH_RESET    — если 1 (по умолчанию): после open(serial) вызвать
+                              «st-flash reset», затем ждать маркеры. Иначе сброс
+                              до open — ранние строки ([WALLET] MAIN ok и т.д.) теряются.
 
 Doc index: README.md
 """
@@ -29,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -49,9 +53,8 @@ def _rx_stats_line(buf: str) -> str:
     hint = ""
     if nbyte == 0:
         hint = (
-            " (ничего не прочитано: неверный порт/скорость, нет прав dialout, "
-            "или бут-лог уже прошёл до открытия COM — нужен reset перед чтением; "
-            "USE_RNG_DUMP=1 даёт бинарный поток без строк [WALLET])"
+            " (ничего не прочитано: неверный порт/скорость, нет прав dialout; "
+            "USE_RNG_DUMP=1 — бинарный поток без строк [WALLET])"
         )
     return f"RX: {nbyte} byte(s), ~{nlines} line(s){hint}"
 
@@ -135,6 +138,8 @@ def main() -> int:
         ser.reset_input_buffer()
     except OSError:
         pass
+
+    _maybe_st_flash_reset_after_serial_open(ser)
 
     buffer = ""
     t0 = time.time()
