@@ -557,13 +557,11 @@ Verification:
   $ ls -la /dev/ttyACM0           # UART port
 ```
 
-### TRNG Data Capture (автоматический в pipeline)
+### TRNG Data Capture (опционально в pipeline)
 
-Pipeline автоматически:
-1. Прошивает firmware с `USE_RNG_DUMP=1`
-2. Захватывает 2 MB данных с TRNG по UART
-3. Запускает Dieharder анализ (14 тестов)
-4. Проверяет качество энтропии
+Основная сборка в `simple-ci.yml` использует **`USE_RNG_DUMP=0`** (переменная **`CI_BUILD_USE_RNG_DUMP`**, по умолчанию `0`), чтобы на UART шли **текстовые логи** и проходила проверка маркеров из `scripts/ci/uart_boot_markers.txt`. Режим **`USE_RNG_DUMP=1`** отключает обычный UART и заменяет его **бинарным потоком RNG** — тогда строки `[INFO] [MAIN] …` не появятся, а `wc -l` по логу даст ~0 при большом объёме байт.
+
+Отдельный job `hardware-test` может пытаться захватить RNG через `scripts/capture_rng_uart.py` (`continue-on-error`); для полноценного RNG-режима задайте **`CI_BUILD_USE_RNG_DUMP=1`** в env runner и учтите, что этап **Analyse UART Log** по текстовым маркерам станет недоступен.
 
 **Локальное тестирование:**
 ```bash
@@ -835,6 +833,8 @@ podman stats
 - **`CRYPTO_DEPS_ROOT`** (по умолчанию `/data/projects`) — родитель каталогов `stm32_secure_boot`, `STM32CubeH7`, `stm32-ssd1306` (глобально и в job `build`).
 - **`Makefile`** читает ту же переменную: если она задана, пути к внешним деревьям берутся из `$(CRYPTO_DEPS_ROOT)/…`, иначе — из `../…` рядом с репозиторием.
 - При необходимости переопределите **`CI_FIRMWARE_SECURE_BOOT`**, **`CI_FIRMWARE_CUBE_ROOT`**, **`CI_FIRMWARE_SSD1306`** в env runner или Gitea (экспорт в шаге сборки передаётся в `make`).
+- **`CI_BUILD_USE_RNG_DUMP`**: `0` — сборка для проверки UART-маркеров; `1` — только для сценариев с бинарным RNG на UART (не сочетать с ожиданием текстового boot log).
+- Шаг **Setup Python** в `analyse-log` ставит **`python3-serial`** через apt (обход PEP 668) либо venv с pip, если apt недоступен.
 
 Корневой **`.gitmodules`** описывает `ThirdParty/trezor-crypto`; checkout с `submodules: recursive` убирает предупреждение «No url found for submodule» — **файл должен быть в ветке на Gitea** (закоммитьте и push).
 

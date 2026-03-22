@@ -20,7 +20,8 @@
 # ставит только нужные пакеты (apt). CI_APT_INSTALL_ARM=false — не вызывать apt, только проверка.
 # Python: см. CI_INSTALL_HOST_DEPS ниже и шаги pip/venv.
 
-name: Simple CI - Build → Flash → Test
+# Имя без «→»: часть раннеров/act некорректно парсит workflow при спецсимволах в name.
+name: Simple CI - Build Flash Test
 
 on:
   push:
@@ -35,9 +36,11 @@ env:
   CI_APT_INSTALL_ARM: 'true'
   # Makefile: пути к stm32_secure_boot / STM32CubeH7 / stm32-ssd1306 (обязательно для host checkout в act cache)
   CRYPTO_DEPS_ROOT: '/data/projects'
-  # HIL UART: пауза после st-flash; ожидание маркеров в job «Analyse UART Log» (scripts/ci/)
+  # HIL UART: пауза перед чтением порта в job «Analyse UART Log» (после flash)
   CI_UART_POST_FLASH_SLEEP_SEC: '4'
   CI_UART_BOOT_TIMEOUT_SEC: '120'
+  # Сборка для UART-маркеров: НЕ включать USE_RNG_DUMP (иначе UART — только бинарный RNG, без [INFO] строк)
+  CI_BUILD_USE_RNG_DUMP: '0'
 
 # Явно bash для всех шагов `run:` (как в интерактивной shell).
 defaults:
@@ -192,17 +195,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      - name: Setup Python (pyserial — без PEP 668 pip на системный Python)
         run: |
-          python3 -m pip install -q pyserial || echo "pyserial already installed"
+          set -euo pipefail
+          if python3 -c "import serial" 2>/dev/null; then
+            echo "✓ python3-serial / pyserial already importable"
+            exit 0
+          fi
+          if command -v apt-get >/dev/null 2>&1; then
+            export DEBIAN_FRONTEND=noninteractive
+            if [ "$(id -u)" -eq 0 ]; then
+              apt-get update -qq
+              apt-get install -y --no-install-recommends python3-serial
+            else
+              sudo apt-get update -qq
+              sudo apt-get install -y --no-install-recommends python3-serial
+            fi
+          else
+            python3 -m venv .venv-ci-uart
+            .venv-ci-uart/bin/pip install -q pyserial
+            echo "PY_UART=$(pwd)/.venv-ci-uart/bin/python3" >> "$GITHUB_ENV"
+          fi
+          python3 -c "import serial; print('✓ pyserial OK')"
 
       - name: Wait for boot log markers (UART)
         run: |
           set -euo pipefail
           touch uart_boot_status.txt uart_output.log
+          PY="${PY_UART:-python3}"
           echo "📡 UART: ordered markers from scripts/ci/uart_boot_markers.txt"
           echo "   Timeout: ${CI_UART_BOOT_TIMEOUT_SEC:-120}s  port: ${CI_UART_PORT:-/dev/ttyACM0}"
-          python3 scripts/ci/uart_wait_boot_log.py \
+          echo "⏳ Post-flash pause: ${CI_UART_POST_FLASH_SLEEP_SEC:-4}s"
+          sleep "${CI_UART_POST_FLASH_SLEEP_SEC:-4}"
+          "$PY" scripts/ci/uart_wait_boot_log.py \
             --markers-file scripts/ci/uart_boot_markers.txt \
             --timeout "${CI_UART_BOOT_TIMEOUT_SEC:-120}"
 
