@@ -1,0 +1,20 @@
+# Подстроки UART в порядке появления (см. Core/Inc/app_log.h — префиксы [INFO]/[ERR]/…).
+# Если порядок на вашей плате другой (приоритеты задач), поменяйте строки местами.
+
+[INFO] [MAIN] CryptoWallet + LwIP
+[INFO] [MAIN] queues OK
+[INFO] [MAIN] tasks created, starting scheduler
+[INFO] [SIGN] task started
+[INFO] [SIGN] ready
+[INFO] [NET] task started
+[INFO] [NET] tcpip OK
+[INFO] [ETH] Link down
+[INFO] [NET] HTTP stack ready
+[INFO] [DISP] task started
+[INFO] [USER] task started
+[INFO] [IO] task started
+[INFO] [DISP] OLED OK
+[INFO] [ETH] Link up
+[INFO] [DHCP] Start
+[DHCP] Assigned IP=
+[INFO] [TIME] SNTP started (pool.ntp.org)

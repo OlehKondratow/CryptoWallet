@@ -14,6 +14,7 @@
 #include "hw_init.h"
 #include "main.h"
 #include "task_display.h"
+#include "app_log.h"
 #include "lwip/apps/sntp.h"
 #include "lwip/tcpip.h"
 #include <stdio.h>
@@ -33,7 +34,7 @@ static void time_service_sntp_start_cb(void *arg)
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
     sntp_setservername(0, "pool.ntp.org");
     sntp_init();
-    Task_Display_Log("[TIME] SNTP started (pool.ntp.org)");
+    APP_LOG_INFO("[TIME] SNTP started (pool.ntp.org)");
 }
 
 /**
@@ -108,7 +109,7 @@ void time_service_start(void)
     err = tcpip_callback(time_service_sntp_start_cb, NULL);
     if (err != ERR_OK) {
         s_sntp_started = 0U;
-        Task_Display_Log("[TIME] SNTP start callback failed");
+        APP_LOG_WARN("[TIME] SNTP start callback failed");
     }
 }
 
@@ -124,7 +125,7 @@ void time_service_set_epoch(uint32_t epoch_sec)
     s_tick_base_ms = HAL_GetTick();
     s_time_synced = 1U;
 
-    (void)snprintf(line, sizeof(line), "[TIME] SNTP sync epoch=%lu", (unsigned long)epoch_sec);
+    (void)snprintf(line, sizeof(line), "[INFO] [TIME] SNTP sync epoch=%lu", (unsigned long)epoch_sec);
     Task_Display_Log(line);
 }
 

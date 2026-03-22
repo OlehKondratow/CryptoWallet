@@ -31,6 +31,7 @@
 
 #include "main.h"
 #include "hw_init.h"
+#include "app_log.h"
 #include "time_service.h"
 #include "wallet_shared.h"
 #include "task_display.h"
@@ -57,6 +58,7 @@
 #include "event_groups.h"
 #include "semphr.h"
 #include "cmsis_os2.h"
+#include <stdio.h>
 
 /*-----------------------------------------------------------------------------
  * Global handles (wallet_shared.h)
@@ -78,7 +80,7 @@ volatile uint8_t  g_last_sig_ready = 0;
  */
 void Error_Handler(void)
 {
-    UART_Log("[ERR]\r\n");
+    APP_LOG_ERR("[MAIN] Error_Handler");
     for (;;) {}
 }
 
@@ -88,7 +90,7 @@ void Error_Handler(void)
  */
 void vApplicationMallocFailedHook(void)
 {
-    UART_Log("[MALLOC FAIL]\r\n");
+    APP_LOG_ERR("[RTOS] malloc failed");
     for (;;) {}
 }
 
@@ -100,10 +102,15 @@ void vApplicationMallocFailedHook(void)
  */
 void vApplicationStackOverflowHook(TaskHandle_t xTask, char *pcTaskName)
 {
+    char buf[80];
+
     (void)xTask;
-    UART_Log("[STACK OVF ");
-    if (pcTaskName != NULL) UART_Log(pcTaskName);
-    UART_Log("]\r\n");
+    if (pcTaskName != NULL) {
+        (void)snprintf(buf, sizeof(buf), "[RTOS] stack overflow task=%s", pcTaskName);
+        App_Log_ErrMsg(buf);
+    } else {
+        APP_LOG_ERR("[RTOS] stack overflow");
+    }
     for (;;) {}
 }
 
@@ -125,7 +132,7 @@ int main(void)
 #ifdef USE_CRYPTO_SIGN
     crypto_rng_init();
 #endif
-    Task_Display_Log("CryptoWallet + LwIP");
+    APP_LOG_INFO("[MAIN] CryptoWallet + LwIP");
     HAL_GPIO_WritePin(LED1_GPIO_PORT, LED1_PIN, LED1_ON_LEVEL);
     HAL_GPIO_WritePin(LED2_GPIO_PORT, LED2_PIN, LED2_OFF_LEVEL);
     HAL_GPIO_WritePin(LED3_GPIO_PORT, LED3_PIN, LED3_OFF_LEVEL);
@@ -134,7 +141,7 @@ int main(void)
     /* Diagnostic: no FreeRTOS, just blink LED. Use: make boottest */
     for (;;) {
         HAL_GPIO_TogglePin(LED1_GPIO_PORT, LED1_PIN);
-        Task_Display_Log("boot");
+        APP_LOG_INFO("[MAIN] boot (no RTOS)");
         HAL_Delay(500);
     }
 #endif
@@ -150,11 +157,11 @@ int main(void)
         g_i2c_mutex == NULL || g_ui_mutex == NULL || g_display_ctx_mutex == NULL) {
         Error_Handler();
     }
-    Task_Display_Log("main: queues OK");
+    APP_LOG_INFO("[MAIN] queues OK");
 
     /* Same as lwip-uaid-SSD1306: osKernelInitialize before creating threads */
     if (osKernelInitialize() != osOK) {
-        Task_Display_Log("[ERR] osKernelInit");
+        APP_LOG_ERR("[MAIN] osKernelInit failed");
         Error_Handler();
     }
     Task_Display_Create();
@@ -165,7 +172,7 @@ int main(void)
 #ifdef USE_RNG_DUMP
     RNG_Dump_Task_Create();
 #endif
-    Task_Display_Log("main: tasks created, starting scheduler");
+    APP_LOG_INFO("[MAIN] tasks created, starting scheduler");
 
 #if !SKIP_OLED
     /* OLED already inited in HW_Init (right after I2C). Show startup banner. */

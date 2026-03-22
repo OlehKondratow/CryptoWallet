@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "hw_init.h"
+#include "app_log.h"
 #if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
 #include "usb_device.h"
 #endif
@@ -119,9 +120,9 @@ void HW_Init(void)
 #endif
     MX_USART3_Init();
 #if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
-    Task_Display_Log("USB init");
+    APP_LOG_INFO("[USB] init");
     MX_USB_Device_Init();
-    Task_Display_Log("USB ready");
+    APP_LOG_INFO("[USB] ready");
 #endif
 #if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
     MX_RNG_Init();

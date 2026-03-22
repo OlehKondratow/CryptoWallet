@@ -33,9 +33,23 @@ Then run scripts as `python3 scripts/...` or `python scripts/...` from the repo 
 | Package   | Role                          |
 |-----------|-------------------------------|
 | **pyusb** | WebUSB (`test_usb_sign.py`)   |
-| **pyserial** | UART RNG capture (`capture_rng_uart.py`) |
+| **pyserial** | UART RNG capture (`capture_rng_uart.py`), CI boot log wait (`ci/uart_wait_boot_log.py`) |
 
 There are no extra transitive dependencies for these versions; `requirements.lock.txt` lists the same two packages with pinned versions.
+
+### CI / HIL: ожидание строк UART при загрузке
+
+**`scripts/ci/uart_wait_boot_log.py`** — читает порт и ждёт подстрок из **`scripts/ci/uart_boot_markers.txt`** **по порядку** (LwIP, HTTP, DHCP, SNTP и т.д.). Используется в `.gitea/workflows/simple-ci.yml` (job «Analyse UART Log»).
+
+```bash
+# Локально после прошивки (порт по умолчанию /dev/ttyACM0):
+python3 scripts/ci/uart_wait_boot_log.py --timeout 120
+# Переменные: CI_UART_PORT, CI_UART_BOOT_TIMEOUT_SEC, CI_UART_MARKERS_FILE, CI_UART_SKIP_NO_DEVICE=1
+```
+
+Если платы нет, при `CI_UART_SKIP_NO_DEVICE=1` скрипт завершается с 0 и пишет `SKIP` в `uart_boot_status.txt`.
+
+**Формат строк в прошивке:** `Core/Inc/app_log.h` — уровни `[ERR]`, `[WARN]`, `[INFO]`, опционально `[DBG]` (`make APP_LOG_ENABLE_DBG=1`). Подсистемы в тексте: `[MAIN]`, `[NET]`, `[SIGN]`, `[DISP]`, `[ETH]`, `[DHCP]`, `[TIME]`, `[HTTP]`, `[USER]`, `[IO]`, `[USB]`.
 
 **Not installed via pip:** `libusb-1.0`, udev rules (WebUSB), `dieharder`, `st-flash`, toolchain — see sections below and the main `README.md`.
 

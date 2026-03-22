@@ -24,6 +24,7 @@
 #include "hw_init.h"
 #include "wallet_shared.h"
 #include "task_display.h"
+#include "app_log.h"
 #include "tx_request_validate.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -215,7 +216,7 @@ static void http_server_thread(void *arg)
         return;
     }
 
-    Task_Display_Log("HTTP :80");
+    APP_LOG_INFO("[NET] HTTP server listening :80");
 
     for (;;) {
         err_t err = netconn_accept(listener, &conn);
@@ -245,14 +246,14 @@ static void http_server_thread(void *arg)
 
                     if (path_len >= 5 && strncmp(p, "/ping", 5) == 0) {
                         /* GET /ping — simple connectivity test */
-                        Task_Display_Log("[HTTP] GET /ping -> pong");
+                        APP_LOG_INFO("[HTTP] GET /ping -> pong");
                         static const char pong[] =
                             "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
                             "Connection: close\r\nContent-Length: 4\r\n\r\npong";
                         (void)netconn_write(conn, pong, sizeof(pong) - 1, NETCONN_COPY);
                     } else if (path_len == 1 && p[0] == '/') {
                         /* GET / — HTML form */
-                        Task_Display_Log("[HTTP] GET /");
+                        APP_LOG_INFO("[HTTP] GET /");
                         static const char html[] =
                             "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
                             "Connection: close\r\n\r\n"
@@ -294,7 +295,7 @@ static void http_server_thread(void *arg)
                             (unsigned)strlen(json), json);
                         (void)netconn_write(conn, req, strlen(req), NETCONN_COPY);
                     } else {
-                        Task_Display_Log("[HTTP] 404");
+                        APP_LOG_WARN("[HTTP] 404");
                         static const char notfound[] =
                             "HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n";
                         (void)netconn_write(conn, notfound, sizeof(notfound) - 1, NETCONN_COPY);
@@ -316,9 +317,9 @@ static void http_server_thread(void *arg)
                     }
                     if (parsed) {
                         if (tx_request_validate(&tx) != TX_VALID_OK) {
-                            Task_Display_Log("[HTTP] TX invalid");
+                            APP_LOG_WARN("[HTTP] TX invalid");
                         } else if (xQueueSend(g_tx_queue, &tx, pdMS_TO_TICKS(100)) == pdTRUE) {
-                            Task_Display_Log("TX enqueued");
+                            APP_LOG_INFO("[HTTP] TX enqueued");
                             Transaction_Data_t disp_tx;
                             memset(&disp_tx, 0, sizeof(disp_tx));
                             (void)snprintf(disp_tx.coin_name, sizeof(disp_tx.coin_name), "%s",
@@ -329,7 +330,7 @@ static void http_server_thread(void *arg)
                             (void)xQueueSend(g_display_queue, &disp_tx, pdMS_TO_TICKS(100));
                         }
                     } else {
-                        Task_Display_Log("[HTTP] POST /tx invalid body");
+                        APP_LOG_WARN("[HTTP] POST /tx invalid body");
                     }
                     static const char resp[] =
                         "HTTP/1.1 200 OK\r\nContent-Type: text/html; charset=utf-8\r\n"
@@ -360,10 +361,10 @@ static void net_task(void *pvParameters)
     ip_addr_t ipaddr, netmask, gw;
 
     /* Same order as lwip-uaid-SSD1306 StartThread: tcpip_init FIRST, no delay */
-    Task_Display_Log("Net: start");
-    Task_Display_Log("Net: tcpip_init...");
+    APP_LOG_INFO("[NET] task started");
+    APP_LOG_INFO("[NET] tcpip_init...");
     tcpip_init(NULL, NULL);
-    Task_Display_Log("Net: tcpip OK");
+    APP_LOG_INFO("[NET] tcpip OK");
 
 #if LWIP_DHCP
     ip_addr_set_zero_ip4(&ipaddr);
@@ -404,7 +405,7 @@ static void net_task(void *pvParameters)
     }
 
     sys_thread_new("HTTP", http_server_thread, NULL, 16384, 2);  /* 16K stack for HTTP (was 2K, 8x increase) */
-    Task_Display_Log("Net: HTTP ready");
+    APP_LOG_INFO("[NET] HTTP stack ready");
 
 #if LWIP_ALIVE_LOG
     TickType_t last_log = xTaskGetTickCount();
@@ -422,7 +423,7 @@ static void net_task(void *pvParameters)
         }
 #if LWIP_ALIVE_LOG
         if ((xTaskGetTickCount() - last_log) >= pdMS_TO_TICKS(10000U)) {
-            Task_Display_Log("Net: alive");
+            APP_LOG_INFO("[NET] alive");
             last_log = xTaskGetTickCount();
         }
 #endif

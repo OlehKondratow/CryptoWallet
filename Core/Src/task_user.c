@@ -17,6 +17,7 @@
 #include "main.h"
 #include "wallet_shared.h"
 #include "task_display.h"
+#include "app_log.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include "event_groups.h"
@@ -44,7 +45,8 @@ static void user_task(void *pvParameters)
     uint32_t last_press_duration = 0;
     bool action_fired = false;
 
-    Task_Display_Log("User btn init");
+    APP_LOG_INFO("[USER] task started");
+    APP_LOG_INFO("[USER] button debounce active");
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
@@ -74,7 +76,7 @@ static void user_task(void *pvParameters)
             if (last_press_duration >= DEBOUNCE_MS && last_press_duration < LONG_PRESS_MS && !action_fired) {
                 action_fired = true;
                 xEventGroupSetBits(g_user_event_group, EVENT_USER_CONFIRMED);
-                Task_Display_Log("Confirm");
+                APP_LOG_INFO("[USER] confirm");
             }
             last_press_duration = 0;
         }

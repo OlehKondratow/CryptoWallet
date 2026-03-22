@@ -14,6 +14,7 @@
 #include "main.h"
 #include "hw_init.h"
 #include "task_display.h"
+#include "app_log.h"
 #include "time_service.h"
 #include "cmsis_os2.h"
 #include "lwip/netif.h"
@@ -80,7 +81,7 @@ static void ethernet_log_netif_addr(const char *prefix, const struct netif *neti
     if (ip4addr_ntoa_r(netif_ip4_gw(netif), gw_buf, sizeof(gw_buf)) == NULL)
         (void)snprintf(gw_buf, sizeof(gw_buf), "0.0.0.0");
 
-    (void)snprintf(line, sizeof(line), "%s IP=%s MASK=%s GW=%s", prefix, ip_buf, mask_buf, gw_buf);
+    (void)snprintf(line, sizeof(line), "[INFO] %s IP=%s MASK=%s GW=%s", prefix, ip_buf, mask_buf, gw_buf);
     Task_Display_Log(line);
 }
 
@@ -97,7 +98,7 @@ void ethernet_link_status_updated(struct netif *netif)
     s_last_link_up = link_up;
 
     if (link_up) {
-        Task_Display_Log("[ETH] Link up");
+        APP_LOG_INFO("[ETH] Link up");
 #if LWIP_DHCP
         DHCP_state = DHCP_START;
 #else
@@ -105,7 +106,7 @@ void ethernet_link_status_updated(struct netif *netif)
         time_service_start();
 #endif
     } else {
-        Task_Display_Log("[ETH] Link down");
+        APP_LOG_INFO("[ETH] Link down");
 #if LWIP_DHCP
         DHCP_state = DHCP_LINK_DOWN;
 #else
@@ -129,7 +130,7 @@ void DHCP_Thread(void *argument)
     for (;;) {
         switch (DHCP_state) {
         case DHCP_START:
-            Task_Display_Log("[DHCP] Start");
+            APP_LOG_INFO("[DHCP] Start");
             ip_addr_set_zero_ip4(&netif->ip_addr);
             ip_addr_set_zero_ip4(&netif->netmask);
             ip_addr_set_zero_ip4(&netif->gw);

@@ -17,6 +17,7 @@
 #include "main.h"
 #include "wallet_shared.h"
 #include "task_display.h"
+#include "app_log.h"
 #include "FreeRTOS.h"
 #include "task.h"
 #include <stdbool.h>
@@ -66,7 +67,8 @@ static void io_task(void *pvParameters)
 #endif
     led3_set(false);
 
-    Task_Display_Log("IO init");
+    APP_LOG_INFO("[IO] task started");
+    APP_LOG_INFO("[IO] LED policy active");
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));

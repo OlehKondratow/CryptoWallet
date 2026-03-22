@@ -20,6 +20,7 @@
   */
 
 #include "task_display.h"
+#include "app_log.h"
 #include "main.h"
 #include "hw_init.h"
 #include "wallet_shared.h"
@@ -301,7 +302,7 @@ static void display_task(void *pvParameters)
     ssd1306_UpdateScreen();
     display_unlock();
 
-    Task_Display_Log("Display init");
+    APP_LOG_INFO("[DISP] UI task started");
 
     for (;;) {
         Transaction_Data_t tx;
@@ -311,7 +312,7 @@ static void display_task(void *pvParameters)
                 s_ui_data.pending_tx.is_pending = 1;
                 xSemaphoreGive(g_ui_mutex);
             }
-            Task_Display_Log("TX recv");
+            APP_LOG_INFO("[DISP] pending TX from queue");
         }
 
         render_four_scroll_lines();

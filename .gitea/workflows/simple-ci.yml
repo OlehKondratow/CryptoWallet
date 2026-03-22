@@ -35,6 +35,9 @@ env:
   CI_APT_INSTALL_ARM: 'true'
   # Makefile: пути к stm32_secure_boot / STM32CubeH7 / stm32-ssd1306 (обязательно для host checkout в act cache)
   CRYPTO_DEPS_ROOT: '/data/projects'
+  # HIL UART: пауза после st-flash; ожидание маркеров в job «Analyse UART Log» (scripts/ci/)
+  CI_UART_POST_FLASH_SLEEP_SEC: '4'
+  CI_UART_BOOT_TIMEOUT_SEC: '120'
 
 # Явно bash для всех шагов `run:` (как в интерактивной shell).
 defaults:
@@ -184,6 +187,7 @@ jobs:
     runs-on: cryptowallet-host
     needs: flash
     if: always()
+    timeout-minutes: 15
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -192,56 +196,24 @@ jobs:
         run: |
           python3 -m pip install -q pyserial || echo "pyserial already installed"
 
-      - name: Read UART output (5 seconds)
+      - name: Wait for boot log markers (UART)
         run: |
-          echo "📡 Reading UART output..."
-          python3 << 'PYTHON_EOF'
-          import serial
-          import time
-          import os
-          
-          uart_file = "uart_output.log"
-          
-          if not os.path.exists("/dev/ttyACM0"):
-              print("⚠️  /dev/ttyACM0 not available (device not connected)")
-              print("   Skipping UART read")
-              open(uart_file, 'w').write("Device not connected\n")
-              exit(0)
-          
-          try:
-              ser = serial.Serial("/dev/ttyACM0", baudrate=115200, timeout=0.5)
-              time.sleep(0.5)
-              
-              print("📡 Connected to UART")
-              
-              output = []
-              timeout = time.time() + 5  # 5 second read
-              
-              while time.time() < timeout:
-                  if ser.in_waiting > 0:
-                      chunk = ser.read(ser.in_waiting)
-                      text = chunk.decode('utf-8', errors='ignore')
-                      output.append(text)
-                      print(text, end='', flush=True)
-                  else:
-                      time.sleep(0.1)
-              
-              ser.close()
-              
-              # Save to file
-              with open(uart_file, 'w') as f:
-                  f.write(''.join(output))
-              
-              print("\n✓ UART log saved to:", uart_file)
-              
-          except Exception as e:
-              print(f"✗ UART error: {e}")
-              open(uart_file, 'w').write(f"Error: {e}\n")
-          PYTHON_EOF
+          set -euo pipefail
+          touch uart_boot_status.txt uart_output.log
+          echo "📡 UART: ordered markers from scripts/ci/uart_boot_markers.txt"
+          echo "   Timeout: ${CI_UART_BOOT_TIMEOUT_SEC:-120}s  port: ${CI_UART_PORT:-/dev/ttyACM0}"
+          python3 scripts/ci/uart_wait_boot_log.py \
+            --markers-file scripts/ci/uart_boot_markers.txt \
+            --timeout "${CI_UART_BOOT_TIMEOUT_SEC:-120}"
 
       - name: Display log analysis
         if: always()
         run: |
+          if [ -f uart_boot_status.txt ]; then
+            echo "=== Boot marker status ==="
+            cat uart_boot_status.txt
+            echo ""
+          fi
           if [ -f uart_output.log ]; then
             echo "=== UART Output ==="
             cat uart_output.log
@@ -263,7 +235,9 @@ jobs:
         uses: actions/upload-artifact@v3
         with:
           name: uart-logs
-          path: uart_output.log
+          path: |
+            uart_output.log
+            uart_boot_status.txt
           retention-days: 7
 
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

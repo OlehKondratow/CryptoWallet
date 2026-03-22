@@ -12,6 +12,7 @@
 
 #include "main.h"
 #include "hw_init.h"
+#include "app_log.h"
 #include "task_display.h"
 #include "wallet_shared.h"
 #include "ssd1306.h"
@@ -93,13 +94,12 @@ void UI_ClearPending(void)
 static void display_task(void *pvParameters)
 {
     (void)pvParameters;
-    Task_Display_Log("Disp start");
+    APP_LOG_INFO("[DISP] task started");
     vTaskDelay(pdMS_TO_TICKS(100));
 
 #if !SKIP_OLED
     /* OLED already inited in main (before scheduler) — same as lwip-uaid-SSD1306 */
-    UART_Log("Disp: OLED OK\r\n");  /* Direct UART for diagnostics */
-    Task_Display_Log("Disp: OLED OK");
+    APP_LOG_INFO("[DISP] OLED OK");
     if (g_i2c_mutex != NULL && xSemaphoreTake(g_i2c_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
         ssd1306_SetCursor(0, 8);
         ssd1306_WriteString("+ LwIP", Font_6x8, White);
@@ -109,15 +109,16 @@ static void display_task(void *pvParameters)
         xSemaphoreGive(g_i2c_mutex);
     }
 #else
-    Task_Display_Log("Disp: OLED skipped (SKIP_OLED=1)");
+    APP_LOG_WARN("[DISP] OLED skipped (SKIP_OLED=1)");
 #endif
+    APP_LOG_INFO("[DISP] refresh loop active");
 
     TickType_t last_log = xTaskGetTickCount();
     for (;;) {
         HAL_GPIO_TogglePin(LED1_GPIO_PORT, LED1_PIN);
 #if LWIP_ALIVE_LOG
         if ((xTaskGetTickCount() - last_log) >= pdMS_TO_TICKS(5000)) {
-            Task_Display_Log("Disp: alive");
+            APP_LOG_INFO("[DISP] alive");
             last_log = xTaskGetTickCount();
         }
 #endif

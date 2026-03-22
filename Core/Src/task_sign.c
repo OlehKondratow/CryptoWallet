@@ -24,6 +24,7 @@
 #include "main.h"
 #include "wallet_shared.h"
 #include "task_display.h"
+#include "app_log.h"
 #include "tx_request_validate.h"
 #include "crypto_wallet.h"
 #include "memzero.h"
@@ -109,7 +110,8 @@ static void sign_task(void *pvParameters)
         g_display_ctx.signature_valid = false;
         xSemaphoreGive(g_display_ctx_mutex);
     }
-    Task_Display_Log("Sign task init");
+    APP_LOG_INFO("[SIGN] task started");
+    APP_LOG_INFO("[SIGN] ready");
 
     for (;;) {
         if (state == SIGNING_IDLE) {
@@ -120,7 +122,7 @@ static void sign_task(void *pvParameters)
             /* --- Request analysis & validation --- */
             tx_validate_result_t vr = tx_request_validate(&tx);
             if (vr != TX_VALID_OK) {
-                Task_Display_Log(tx_validate_result_str(vr));
+                App_Log_WarnMsg(tx_validate_result_str(vr));
                 g_security_alert = 1;
                 memzero(&tx, sizeof(tx));
                 continue;
@@ -162,14 +164,14 @@ static void sign_task(void *pvParameters)
                     pdTRUE, pdFALSE, pdMS_TO_TICKS(CONFIRM_TIMEOUT_MS));
 
             if (bits & EVENT_USER_REJECTED) {
-                Task_Display_Log("Rejected");
+                APP_LOG_WARN("[SIGN] user rejected");
                 memzero(digest, sizeof(digest));
                 memzero(&tx, sizeof(tx));
                 state = SIGNING_IDLE;
                 continue;
             }
             if (!(bits & EVENT_USER_CONFIRMED)) {
-                Task_Display_Log("Timeout");
+                APP_LOG_WARN("[SIGN] confirm timeout");
                 memzero(digest, sizeof(digest));
                 memzero(&tx, sizeof(tx));
                 state = SIGNING_IDLE;
@@ -180,7 +182,7 @@ static void sign_task(void *pvParameters)
             uint8_t seed[64];
             memzero(seed, sizeof(seed));
             if (get_wallet_seed(seed, sizeof(seed)) != 0) {
-                Task_Display_Log("No seed");
+                APP_LOG_ERR("[SIGN] no seed");
                 g_security_alert = 1;
                 memzero(digest, sizeof(digest));
                 memzero(&tx, sizeof(tx));
@@ -189,7 +191,7 @@ static void sign_task(void *pvParameters)
             }
             if (crypto_derive_btc_m44_0_0_0_0(seed, 64, priv_key) != 0) {
                 memzero(seed, sizeof(seed));
-                Task_Display_Log("Derive err");
+                APP_LOG_ERR("[SIGN] key derive failed");
                 g_security_alert = 1;
                 memzero(digest, sizeof(digest));
                 memzero(&tx, sizeof(tx));
@@ -200,7 +202,7 @@ static void sign_task(void *pvParameters)
 
             /* Sign */
             if (crypto_sign_btc_hash(priv_key, digest, sig) != 0) {
-                Task_Display_Log("Sign err");
+                APP_LOG_ERR("[SIGN] ECDSA sign failed");
                 g_security_alert = 1;
                 memzero(digest, sizeof(digest));
                 memzero(sig, sizeof(sig));
@@ -219,7 +221,7 @@ static void sign_task(void *pvParameters)
             memzero(sig, sizeof(sig));
             memzero(&tx, sizeof(tx));
             g_security_alert = 0;
-            Task_Display_Log("Signed OK");
+            APP_LOG_INFO("[SIGN] signed OK");
 
             if (xSemaphoreTake(g_display_ctx_mutex, pdMS_TO_TICKS(50)) == pdTRUE) {
                 g_display_ctx.safe_locked = true;
