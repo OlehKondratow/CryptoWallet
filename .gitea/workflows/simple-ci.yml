@@ -36,12 +36,9 @@ env:
   CI_APT_INSTALL_ARM: 'true'
   # Makefile: пути к stm32_secure_boot / STM32CubeH7 / stm32-ssd1306 (обязательно для host checkout в act cache)
   CRYPTO_DEPS_ROOT: '/data/projects'
-  # HIL UART: пауза перед чтением порта в job «Analyse UART Log» (после flash)
-  CI_UART_POST_FLASH_SLEEP_SEC: '4'
-  # После st-flash reset — короткая пауза перед open(COM); 4s съедает начало бут-лога
-  CI_UART_AFTER_RESET_SLEEP_SEC: '0.5'
+  # HIL UART: st-flash reset выполняется ВНУТРИ uart_wait_boot_log.py ПОСЛЕ open(COM),
+  # иначе теряются ранние строки [WALLET] MAIN ok / IO / NET / …
   CI_UART_BOOT_TIMEOUT_SEC: '120'
-  # Перед чтением UART: st-flash reset (job «Analyse» идёт после flash — без сброса бут-лог уже прошёл)
   CI_UART_ST_FLASH_RESET: '1'
   # Сборка для UART-маркеров: НЕ включать USE_RNG_DUMP (иначе UART — только бинарный RNG, без [INFO] строк)
   CI_BUILD_USE_RNG_DUMP: '0'
@@ -225,23 +222,6 @@ jobs:
           fi
           python3 -c "import serial; print('✓ pyserial OK')"
 
-      # Отдельный job после flash: без сброса бут-лог уже ушёл до открытия COM. st-flash reset даёт новую загрузку.
-      - name: Reset MCU before UART capture
-        run: |
-          set -euo pipefail
-          if [ "${CI_UART_ST_FLASH_RESET:-1}" = "0" ]; then
-            echo "⏭️  CI_UART_ST_FLASH_RESET=0 — пропуск st-flash reset"
-            exit 0
-          fi
-          if command -v st-flash >/dev/null 2>&1; then
-            echo "🔁 st-flash reset — новая загрузка, пока слушаем ${CI_UART_PORT:-/dev/ttyACM0}"
-            st-flash reset || st-flash --connect-under-reset reset || {
-              echo "⚠️  st-flash reset failed (нет ST-LINK?); UART всё равно попробуем"
-            }
-          else
-            echo "⚠️  st-flash не в PATH — установите stlink-tools или добавьте в PATH"
-          fi
-
       - name: Wait for boot log markers (UART)
         run: |
           set -euo pipefail
@@ -249,8 +229,7 @@ jobs:
           PY="${PY_UART:-python3}"
           echo "📡 UART: all service markers from scripts/ci/uart_boot_markers.txt (order irrelevant)"
           echo "   Timeout: ${CI_UART_BOOT_TIMEOUT_SEC:-120}s  port: ${CI_UART_PORT:-/dev/ttyACM0}"
-          echo "⏳ After reset, before open(serial): ${CI_UART_AFTER_RESET_SLEEP_SEC:-0.5}s (avoid long sleep — boot log starts immediately)"
-          sleep "${CI_UART_AFTER_RESET_SLEEP_SEC:-0.5}"
+          echo "   (st-flash reset runs inside Python after open(serial) — full boot log)"
           set +e
           "$PY" scripts/ci/uart_wait_boot_log.py \
             --markers-file scripts/ci/uart_boot_markers.txt \

@@ -72,6 +72,48 @@ def load_markers(path: Path) -> list[str]:
     return lines
 
 
+def _maybe_st_flash_reset_after_serial_open(ser) -> None:
+    """
+    Сброс МК после открытия COM: иначе бут-лог (MAIN ok, IO/NET/SIGN/USER до link-up)
+    успевает уйти до того, как хост откроет порт.
+    """
+    if os.environ.get("CI_UART_ST_FLASH_RESET", "1").lower() not in ("1", "true", "yes"):
+        print("⏭️  CI_UART_ST_FLASH_RESET=0 — пропуск st-flash reset после open(serial)", flush=True)
+        return
+    print(
+        "🔁 st-flash reset (порт уже открыт — захватываем полный бут с [WALLET] MAIN ok …)",
+        flush=True,
+    )
+    attempts = (
+        ["st-flash", "reset"],
+        ["st-flash", "--connect-under-reset", "reset"],
+    )
+    last_err: str | None = None
+    for cmd in attempts:
+        try:
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=45)
+            if r.returncode == 0:
+                print(f"   ✓ {' '.join(cmd)}", flush=True)
+                time.sleep(0.25)
+                try:
+                    ser.reset_input_buffer()
+                except OSError:
+                    pass
+                return
+            last_err = (r.stderr or r.stdout or "").strip() or f"exit {r.returncode}"
+        except FileNotFoundError:
+            print(
+                "⚠️  st-flash не найден в PATH — установите stlink-tools; "
+                "лог без сброса после open может быть неполным.",
+                flush=True,
+            )
+            return
+        except subprocess.TimeoutExpired:
+            last_err = "timeout"
+            break
+    print(f"⚠️  st-flash reset не удался ({last_err!r}) — продолжаем без сброса", flush=True)
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Wait for UART boot log markers (default: any order)")
     ap.add_argument(
