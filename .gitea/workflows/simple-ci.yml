@@ -173,8 +173,8 @@ jobs:
           make clean
           # CI_BUILD_USE_RNG_DUMP: 1 = бинарный TRNG на UART (дефолт CI); 0 = текстовые маркеры
           RNG="${CI_BUILD_USE_RNG_DUMP:-1}"
-          echo "🔧 USE_RNG_DUMP=$RNG"
-          make "USE_RNG_DUMP=$RNG" -j"$(nproc)"
+          echo "🔧 USE_RNG_DUMP=$RNG USE_WEBUSB=1 (default: WebUSB on; CWUP on UART when RNG=0)"
+          make "USE_RNG_DUMP=$RNG" USE_WEBUSB=1 -j"$(nproc)"
           echo ""
           echo "✅ Build complete:"
           ls -lh build/cryptowallet.bin build/cryptowallet.elf

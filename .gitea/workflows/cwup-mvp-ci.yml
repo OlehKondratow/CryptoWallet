@@ -96,8 +96,8 @@ jobs:
           [ -n "${CI_FIRMWARE_CUBE_ROOT:-}" ] && export CUBE_ROOT="$CI_FIRMWARE_CUBE_ROOT"
           [ -n "${CI_FIRMWARE_SSD1306:-}" ] && export SSD1306="$CI_FIRMWARE_SSD1306"
           make clean
-          echo "🔧 USE_RNG_DUMP=0 USE_TEST_SEED=1 (CWUP + lab seed for AT+WALLET?)"
-          make USE_RNG_DUMP=0 USE_TEST_SEED=1 -j"$(nproc)"
+          echo "🔧 USE_RNG_DUMP=0 USE_WEBUSB=1 USE_TEST_SEED=1 (CWUP + WebUSB + lab seed for AT+WALLET?)"
+          make USE_RNG_DUMP=0 USE_WEBUSB=1 USE_TEST_SEED=1 -j"$(nproc)"
           ls -lh build/cryptowallet.bin build/cryptowallet.elf
 
       - name: MVP host tests (pytest)

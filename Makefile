@@ -77,13 +77,13 @@ ifeq ($(USE_TEST_SEED),1)
 CFLAGS  += -DUSE_TEST_SEED=1
 endif
 # USE_RNG_DUMP=1: output raw RNG data on UART (for Dieharder testing)
-# WARNING: Disables normal UART output - only binary RNG data sent
+# WARNING: Disables CWUP on that UART — only binary RNG data sent (WebUSB still on unless USE_WEBUSB=0)
 USE_RNG_DUMP ?= 0
 ifeq ($(USE_RNG_DUMP),1)
 CFLAGS  += -DUSE_RNG_DUMP=1 -DHAL_RNG_MODULE_ENABLED
 endif
-# USE_WEBUSB=1: USB device + WebUSB (PA11/PA12, CN13)
-USE_WEBUSB ?= 0
+# USE_WEBUSB=1: USB device + WebUSB (PA11/PA12, CN13). Default on together with CWUP when USE_RNG_DUMP=0.
+USE_WEBUSB ?= 1
 ifeq ($(USE_WEBUSB),1)
 CFLAGS  += -DUSE_WEBUSB=1 -DHAL_PCD_MODULE_ENABLED
 CFLAGS  += -I$(CUBE_ROOT)/Middlewares/ST/STM32_USB_Device_Library/Core/Inc

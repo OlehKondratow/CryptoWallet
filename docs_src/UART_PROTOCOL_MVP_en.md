@@ -6,6 +6,8 @@
 
 <brief>Minimal UART3 protocol for **lab diagnostics**, **CI**, and **framed TRNG capture** with command/binary separation. It does **not** replace the primary user channel (HTTP/WebUSB) and **does not** define firmware update over UART — that belongs to the bootloader (`stm32_secure_boot`) and separate policy.</brief>
 
+**Default build (`make` / `minimal-lwip`):** `USE_WEBUSB=1`, `USE_RNG_DUMP=0` — **WebUSB** (PA11/PA12) and **MVP CWUP** on USART3 together. `USE_RNG_DUMP=1` disables CWUP on UART (binary TRNG stream); disable USB if needed: `USE_WEBUSB=0`.
+
 ---
 
 ## 1. Scope

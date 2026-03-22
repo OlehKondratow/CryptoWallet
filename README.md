@@ -666,7 +666,7 @@ Cryptographic Validation: ECDSA Verification
 ```bash
 make USE_CRYPTO_SIGN=1      # Enable ECDSA signing
 make USE_LWIP=1             # Enable Ethernet + LwIP (default)
-make USE_WEBUSB=1           # Enable USB WebUSB interface
+make USE_WEBUSB=1           # WebUSB (default on; use USE_WEBUSB=0 to disable)
 make USE_TEST_SEED=1        # Use hardcoded test seed (development only)
 make USE_RNG_DUMP=1         # Enable RNG statistical testing
 make SKIP_OLED=1            # Skip I2C/OLED if display bus hangs

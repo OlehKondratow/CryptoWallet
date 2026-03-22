@@ -100,6 +100,8 @@ python3 -m pytest tests/mvp -q
 
 ## WebUSB signing
 
+Default firmware build (`make` / `minimal-lwip`) enables **WebUSB** (`USE_WEBUSB=1`) together with **CWUP** on UART when `USE_RNG_DUMP=0`; disable USB with `USE_WEBUSB=0` if needed.
+
 **`test_usb_sign.py`** — see file docstring; needs **pyusb** and udev rules (`udev/99-cryptowallet-webusb.rules`).
 
 ---
