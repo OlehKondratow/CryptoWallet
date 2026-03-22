@@ -78,10 +78,22 @@ volatile uint8_t  g_last_sig_ready = 0;
  * @brief Fatal error handler - log and infinite loop.
  * @return Never returns.
  */
+void Error_Handler_At(const char *file, int line)
+{
+    if (file != NULL) {
+        char buf[120];
+        (void)snprintf(buf, sizeof(buf), "[MAIN] Error_Handler %s:%d", file, line);
+        App_Log_ErrMsg(buf);
+    } else {
+        APP_LOG_ERR("[MAIN] Error_Handler");
+    }
+    for (;;) {
+    }
+}
+
 void Error_Handler(void)
 {
-    APP_LOG_ERR("[MAIN] Error_Handler");
-    for (;;) {}
+    Error_Handler_At(NULL, 0);
 }
 
 /**

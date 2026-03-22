@@ -14,6 +14,8 @@ extern uint32_t SystemCoreClock;
 #define CMSIS_device_header "stm32h7xx.h"
 #endif
 
+#include "fault_report.h"
+
 #define configENABLE_FPU 1
 #define configENABLE_MPU 0
 
@@ -96,7 +98,13 @@ extern uint32_t SystemCoreClock;
 #define configKERNEL_INTERRUPT_PRIORITY (configLIBRARY_LOWEST_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY (configLIBRARY_MAX_SYSCALL_INTERRUPT_PRIORITY << (8 - configPRIO_BITS))
 
-#define configASSERT(x) do { if ((x) == 0) { taskDISABLE_INTERRUPTS(); for (;;) {} } } while (0)
+#define configASSERT(x)                                                                                    \
+    do {                                                                                                   \
+        if ((x) == 0) {                                                                                    \
+            taskDISABLE_INTERRUPTS();                                                                      \
+            Fault_ConfigAssertFailed(__FILE__, __LINE__);                                                  \
+        }                                                                                                  \
+    } while (0)
 
 #define vPortSVCHandler SVC_Handler
 #define xPortPendSVHandler PendSV_Handler

@@ -214,7 +214,7 @@ CRYPTO_OBJ += $(BUILD)/trezor_bip39.o $(BUILD)/trezor_bip32.o $(BUILD)/trezor_ec
       $(BUILD)/trezor_ed25519_basepoint.o $(BUILD)/trezor_ed25519_32bit_tables.o $(BUILD)/trezor_ed25519_impl.o \
       $(BUILD)/trezor_curve25519_scalarmult.o
 endif
-OBJ_MINIMAL_LWIP = $(BUILD)/main.o $(BUILD)/app_log.o $(BUILD)/hw_init.o $(BUILD)/memzero.o $(BUILD)/stm32h7xx_hal_msp.o $(BUILD)/stm32h7xx_it_lwip.o $(BUILD)/stm32h7xx_it_systick.o \
+OBJ_MINIMAL_LWIP = $(BUILD)/main.o $(BUILD)/app_log.o $(BUILD)/hw_init.o $(BUILD)/memzero.o $(BUILD)/stm32h7xx_hal_msp.o $(BUILD)/fault_report.o $(BUILD)/stm32h7xx_it_lwip.o $(BUILD)/stm32h7xx_it_systick.o \
       $(BUILD)/task_display_minimal.o $(BUILD)/task_net.o $(BUILD)/task_sign.o $(BUILD)/task_io.o $(BUILD)/task_user.o $(BUILD)/tx_request_validate.o $(BUILD)/time_service.o \
       $(CRYPTO_OBJ) \
       $(BUILD)/startup_minimal_lwip.o $(BUILD)/system_minimal_lwip.o $(BUILD)/stm32h7xx_hal_timebase_tim.o \
@@ -306,7 +306,10 @@ $(BUILD)/stm32h7xx_hal_msp.o: $(TOP)/Core/Src/stm32h7xx_hal_msp.c | $(BUILD)
 $(BUILD)/stm32h7xx_it.o: $(TOP)/Core/Src/stm32h7xx_it.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-$(BUILD)/stm32h7xx_it_lwip.o: $(LWIP_APP)/Src/stm32h7xx_it.c | $(BUILD)
+# stm32h7xx_it_lwip: ETH only; Cortex fault handlers live in fault_report.c (not LWIP_APP cube file).
+$(BUILD)/stm32h7xx_it_lwip.o: $(TOP)/Core/Src/stm32h7xx_it_lwip.c | $(BUILD)
+	$(CC) $(CFLAGS) -c -o $@ $<
+$(BUILD)/fault_report.o: $(TOP)/Core/Src/fault_report.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<
 $(BUILD)/stm32h7xx_it_systick.o: $(TOP)/Core/Src/stm32h7xx_it_systick.c | $(BUILD)
 	$(CC) $(CFLAGS) -c -o $@ $<

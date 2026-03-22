@@ -7,6 +7,7 @@
 
 #include "main.h"
 #include "hw_init.h"
+#include "fault_report.h"
 #include "app_log.h"
 #if defined(USE_WEBUSB) && (USE_WEBUSB == 1)
 #include "usb_device.h"
@@ -115,6 +116,7 @@ void HW_Init(void)
     for (volatile uint32_t i = 0; i < 2000000; i++) { (void)i; }
     SystemClock_Config();
     SystemCoreClockUpdate();
+    Fault_Report_Init();
 #ifndef USE_LWIP
     CPU_CACHE_Enable();  /* After clock switch — recommended for H7 */
 #endif

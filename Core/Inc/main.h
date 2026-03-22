@@ -107,6 +107,16 @@ extern "C" {
 void Error_Handler(void);
 
 /**
+ * @brief Как Error_Handler, но с указанием места в коде (файл:строка).
+ * @param file Имя файла или NULL для обобщённого сообщения.
+ * @param line Номер строки; при @a file == NULL игнорируется.
+ */
+void Error_Handler_At(const char *file, int line);
+
+/** Остановка с логом @c Error_Handler_At(__FILE__, __LINE__). */
+#define ERROR_HALT() Error_Handler_At(__FILE__, __LINE__)
+
+/**
  * @brief Hardware initialization (clock, MPU, GPIO, I2C1, UART).
  * @note  Called from main() before vTaskStartScheduler().
  * @return None.

@@ -26,6 +26,7 @@
 - **[stm32h7xx_it.md](stm32h7xx_it.md)** - Interrupt handlers
 - **[stm32h7xx_it_systick.md](stm32h7xx_it_systick.md)** - SysTick for minimal-lwip
 - **[stm32h7xx_it_usb.md](stm32h7xx_it_usb.md)** - USB OTG HS interrupt handler
+- **[FAULT_HANDLING.md](FAULT_HANDLING.md)** - Cortex-M faults, UART dump, `Error_Handler_At`, FreeRTOS assert
 
 ### Configuration
 - **[lwipopts.md](lwipopts.md)** - LwIP TCP/IP stack configuration
