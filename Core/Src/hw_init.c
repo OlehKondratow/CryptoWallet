@@ -15,6 +15,9 @@
 #include "stm32h7xx_hal_rng.h"
 #endif
 #include <stddef.h>
+#include "FreeRTOS.h"
+#include "semphr.h"
+#include "task.h"
 #if defined(USE_LWIP) && !SKIP_OLED
 #include "ssd1306.h"
 #include "ssd1306_fonts.h"
@@ -24,6 +27,9 @@ I2C_HandleTypeDef hi2c1;
 #if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
 RNG_HandleTypeDef hrng;
 #endif
+
+/** Сериализация UART TX (создаётся в @c HW_Init ). */
+static SemaphoreHandle_t s_uart_log_mutex;
 
 static void SystemClock_Config(void);
 static void CPU_CACHE_Enable(void);
@@ -127,6 +133,7 @@ void HW_Init(void)
 #if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
     MX_RNG_Init();
 #endif
+    s_uart_log_mutex = xSemaphoreCreateMutex();
 }
 
 #if (defined(USE_CRYPTO_SIGN) && (USE_CRYPTO_SIGN == 1)) || (defined(USE_RNG_DUMP) && (USE_RNG_DUMP == 1))
@@ -276,5 +283,13 @@ void UART_Log(const char *msg)
     size_t n = 0;
     while (msg[n] != '\0' && n < 256) n++;
     if (n == 0) return;
+
+    /* Только при работающем планировщике — до osKernelStart вызовы идут из main, гонки нет */
+    if (s_uart_log_mutex != NULL && xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        (void)xSemaphoreTake(s_uart_log_mutex, pdMS_TO_TICKS(200));
+    }
     HAL_UART_Transmit(&huart3, (const uint8_t *)msg, (uint16_t)n, 500);
+    if (s_uart_log_mutex != NULL && xTaskGetSchedulerState() == taskSCHEDULER_RUNNING) {
+        (void)xSemaphoreGive(s_uart_log_mutex);
+    }
 }
