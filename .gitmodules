@@ -1,0 +1,3 @@
+[submodule "ThirdParty/trezor-crypto"]
+	path = ThirdParty/trezor-crypto
+	url = https://github.com/trezor/trezor-crypto.git

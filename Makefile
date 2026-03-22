@@ -26,9 +26,13 @@ USE_LWIP ?= 1
 
 TOP         ?= $(CURDIR)
 TREZOR_CRYPTO ?= $(abspath $(TOP)/ThirdParty/trezor-crypto)
-CUBE_ROOT   ?= $(abspath $(TOP)/../STM32CubeH7)
-SSD1306     ?= $(abspath $(TOP)/../stm32-ssd1306)
-SECURE_BOOT ?= $(abspath $(TOP)/../stm32_secure_boot)
+# Sibling repos: ../stm32_secure_boot, ../STM32CubeH7, ../stm32-ssd1306.
+# act_runner checkout is often under ~/.cache/act/.../hostexecutor — ../stm32_secure_boot does not exist.
+# Set CRYPTO_DEPS_ROOT (e.g. /data/projects) so paths become $(CRYPTO_DEPS_ROOT)/stm32_secure_boot, etc.
+# CI: export in workflow env or runner config.yaml.
+CUBE_ROOT   ?= $(if $(CRYPTO_DEPS_ROOT),$(CRYPTO_DEPS_ROOT)/STM32CubeH7,$(abspath $(TOP)/../STM32CubeH7))
+SSD1306     ?= $(if $(CRYPTO_DEPS_ROOT),$(CRYPTO_DEPS_ROOT)/stm32-ssd1306,$(abspath $(TOP)/../stm32-ssd1306))
+SECURE_BOOT ?= $(if $(CRYPTO_DEPS_ROOT),$(CRYPTO_DEPS_ROOT)/stm32_secure_boot,$(abspath $(TOP)/../stm32_secure_boot))
 TEMPLATE    := $(CUBE_ROOT)/Projects/NUCLEO-H743ZI/Templates
 LWIP_CUBE   := $(SECURE_BOOT)/app/lwip_zero/cube
 LWIP_APP    := $(SECURE_BOOT)/app/lwip_zero/cube_project

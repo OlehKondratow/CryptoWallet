@@ -826,6 +826,17 @@ podman stats
 - [ ] HIL tests passed
 - [ ] Artifacts available
 
+### Сборка firmware на self-hosted runner
+
+`Makefile` ожидает рядом с рабочей копией каталоги `stm32_secure_boot`, `STM32CubeH7`, `stm32-ssd1306`. В CI checkout часто лежит в кэше (`~/.cache/act/.../hostexecutor`), поэтому относительные пути `../stm32_secure_boot` не работают.
+
+В `.gitea/workflows/simple-ci.yml` заданы:
+
+- **`CRYPTO_DEPS_ROOT`** (по умолчанию `/data/projects`) — родитель каталогов `stm32_secure_boot`, `STM32CubeH7`, `stm32-ssd1306`.
+- При необходимости переопределите **`CI_FIRMWARE_SECURE_BOOT`**, **`CI_FIRMWARE_CUBE_ROOT`**, **`CI_FIRMWARE_SSD1306`** в env runner или Gitea.
+
+Корневой **`.gitmodules`** описывает `ThirdParty/trezor-crypto`; checkout с `submodules: recursive` убирает предупреждение «No url found for submodule».
+
 ---
 
 ## Файловая структура
