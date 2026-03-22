@@ -42,12 +42,11 @@ chmod +x act_runner
 ./act_runner generate-config > config.yaml
 ```
 
-Edit `config.yaml` - set `runner.labels`:
+Edit `config.yaml` - set `runner.labels` (must match `runs-on` in `.gitea/workflows/simple-ci.yml`):
 ```yaml
 runner:
   labels:
-    - ubuntu-latest
-    - host
+    - cryptowallet-host:host
 ```
 
 #### Step 3: Get Registration Token
@@ -122,7 +121,7 @@ journalctl --user -f -u gitea-runner
 
 ### Check Gitea UI
 Go to: **Admin → Runners Management**
-Should see your host runner with status **Active** and labels `ubuntu-latest, host`
+Should see your host runner with status **Active** and label `cryptowallet-host:host`
 
 ---
 
@@ -231,7 +230,7 @@ on:
 jobs:
   on-container:
     name: Container Runner
-    runs-on: ubuntu-latest
+    runs-on: cryptowallet-host
     steps:
       - run: echo "Running on container runner"
       - run: uname -a

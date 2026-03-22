@@ -94,7 +94,7 @@ runner:
   fetch_timeout: 5s
   fetch_interval: 2s
   labels:
-    - ubuntu-latest:host
+    - cryptowallet-host:host
 
 cache:
   enabled: true
@@ -128,7 +128,7 @@ if [ -z "${GITEA_TOKEN}" ]; then
     echo "    --instance ${GITEA_URL} \\"
     echo "    --token \${GITEA_TOKEN} \\"
     echo "    --name ${RUNNER_NAME} \\"
-    echo "    --labels ubuntu-latest:host \\"
+    echo "    --labels cryptowallet-host:host \\"
     echo "    --no-interactive"
     echo ""
     read -p "Enter token (or press Enter to skip): " TOKEN_INPUT
@@ -147,7 +147,7 @@ if ${RUNNER_HOME}/act_runner register \
     --instance "${GITEA_URL}" \
     --token "${GITEA_TOKEN}" \
     --name "${RUNNER_NAME}" \
-    --labels "ubuntu-latest:host" \
+    --labels "cryptowallet-host:host" \
     --no-interactive; then
     echo "✅ Runner registered successfully!"
 else

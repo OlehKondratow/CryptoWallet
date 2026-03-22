@@ -37,12 +37,10 @@ services:
       - /data/gitea/repositories:/data/git/repositories
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
-    # Проброс на хост, чтобы с ЭТОЙ же машины открыть http://127.0.0.1:3000 (macvlan).
+    # Проброс на хост: HTTP + SSH (git remote ssh://git@127.0.0.1:2222/…)
     ports:
       - "3000:3000"
-    # Опционально SSH clone с хоста: ssh://git@127.0.0.1:2222 — раскомментируйте и
-    # выставьте GITEA__SERVER__SSH_PORT=2222 в environment, если 22 занят на хосте.
-    #   - "2222:22"
+      - "2222:22"
     environment:
       - DB_TYPE=sqlite3
       - DB_PATH=/data/gitea/gitea.db
@@ -53,7 +51,8 @@ services:
       # Домен в ссылках (SSH и т.д.); вместе с GITEA_ROOT_URL — из .env или значения по умолчанию
       - GITEA__SERVER__DOMAIN=${GITEA_SERVER_DOMAIN:-127.0.0.1}
       - GITEA__SERVER__ROOT_URL=${GITEA_ROOT_URL:-http://127.0.0.1:3000/}
-      - GITEA__SERVER__SSH_PORT=22
+      # Порт в URL clone (хост: 2222 → контейнер :22); не совпадает с sshd на хосте :22
+      - GITEA__SERVER__SSH_PORT=2222
       - GITEA__SERVER__HTTP_PORT=3000
       - ROOT_URL=${GITEA_ROOT_URL:-http://127.0.0.1:3000/}
     healthcheck:

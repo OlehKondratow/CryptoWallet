@@ -4,7 +4,7 @@
 
 - Если **act_runner запущен от root** (в т.ч. «из каталога проекта»): домашний каталог
   — `/root/`, конфиг может лежать рядом с бинарником или в `/root/gitea-runner/`;
-  джобы с меткой `ubuntu-latest:host` выполняются **от root** на хосте (без Docker job-контейнера).
+  джобы с меткой `cryptowallet-host:host` (см. `simple-ci.yml`) выполняются **от root** на хосте.
 - Если runner от **обычного пользователя** (пример ниже с `pilgrim`): пути вида
   `/home/pilgrim/gitea-runner/`, для Podman — `DOCKER_HOST=unix:///run/user/UID/...`.
 
@@ -188,7 +188,7 @@ http://localhost:3000/admin/CryptoWallet/runs/[RUN_ID]/artifacts/firmware-build/
 
 ```yaml
 hil-test:
-  runs-on: ubuntu-latest
+  runs-on: cryptowallet-host
   steps:
     # After checkout, working dir is at repo root
     # Current working directory implicitly: $RUNNER_WORKSPACE/admin/CryptoWallet/

@@ -230,13 +230,13 @@ cat ~/gitea-runner/config.yaml
 Name: host-runner-ws8
 Status: ACTIVE (systemd service)
 Version: v0.3.0
-Labels (host runner): `ubuntu-latest:host` — джобы без Docker job-контейнера (см. `simple-ci.yml`, не используйте `container: false`).
+Labels: `cryptowallet-host:host` — совпадает с `runs-on: cryptowallet-host` в `simple-ci.yml`.
 Capacity: 1 job at a time
 Podman Socket: /run/user/1000/podman/podman.sock
 ```
 
 ### For Workflows
-- Use `runs-on: ubuntu-latest` for any job (available on host runner)
+- Use `runs-on: cryptowallet-host` in this repo’s workflow (host runner)
 - Use `runs-on: host` if you want to be explicit
 - Build jobs: ~5-10 minutes
 - HIL tests: 30 minutes to 3+ hours depending on scope

@@ -15,9 +15,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 RUNNER_HOME="${RUNNER_HOME:-${HOME}/gitea-runner}"
 RUNNER_NAME="${RUNNER_NAME:-host-runner-$(hostname)}"
 GITEA_URL="${GITEA_URL:-http://127.0.0.1:3000}"
-# Метка `ubuntu-latest:host` — джобы выполняются на хосте без Docker job-контейнера
-# (нужно для checkout к Gitea и /dev/ttyACM*). Не путать с `container: false` в workflow.
-GITEA_RUNNER_LABELS="${GITEA_RUNNER_LABELS:-ubuntu-latest:host}"
+# Метка cryptowallet-host:host — совпадает с runs-on в .gitea/workflows/simple-ci.yml
+# (уникальное имя, чтобы не перехватывал docker-runner с ubuntu-latest:docker).
+GITEA_RUNNER_LABELS="${GITEA_RUNNER_LABELS:-cryptowallet-host:host}"
 
 # Токен: GITEA_RUNNER_TOKEN или GITEA_TOKEN из окружения
 TOKEN="${GITEA_RUNNER_TOKEN:-${GITEA_TOKEN:-}}"

@@ -2,13 +2,14 @@
 #
 # НЕ используйте `container: false` в job: в act_runner v0.3.x это даёт образ
 # `docker.io/library/false` (булево читается как имя образа). Вместо этого
-# зарегистрируйте runner с меткой выполнения на хосте:
-#   act_runner register ... --labels "ubuntu-latest:host"
-# (см. infra/reregister-act-runner.sh — по умолчанию так и есть).
-# Тогда `runs-on: ubuntu-latest` выполняется на хосте: checkout к Gitea, /dev/ttyACM*, st-flash.
+# зарегистрируйте runner ТОЛЬКО с меткой (см. infra/reregister-act-runner.sh):
+#   cryptowallet-host:host
+# В workflow используется runs-on: cryptowallet-host — уникальная метка, чтобы Gitea
+# НЕ назначала job на чужой docker-runner с ubuntu-latest:docker (checkout тогда ломается).
 #
 # Requirements:
-# - Runner: метка ubuntu-latest:host (не docker://… для этого workflow)
+# - Runner: метка cryptowallet-host:host (без docker:// для этого репозитория).
+#   Перерегистрация: GITEA_RUNNER_LABELS=cryptowallet-host:host ./infra/reregister-act-runner.sh
 # - Для HIL: ST-LINK, st-flash/st-info, UART на том же хосте, что и runner
 
 name: Simple CI - Build → Flash → Test
@@ -30,7 +31,7 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   build:
     name: '1️⃣ Build Firmware'
-    runs-on: ubuntu-latest
+    runs-on: cryptowallet-host
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -80,7 +81,7 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   flash:
     name: '2️⃣ Flash & Reset Device'
-    runs-on: ubuntu-latest
+    runs-on: cryptowallet-host
     needs: build
     steps:
       - name: Checkout code
@@ -114,7 +115,7 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   analyse-log:
     name: '3️⃣ Analyse UART Log'
-    runs-on: ubuntu-latest
+    runs-on: cryptowallet-host
     needs: flash
     if: always()
     steps:
@@ -204,7 +205,7 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   quick-test:
     name: '4️⃣ Quick Preliminary Test'
-    runs-on: ubuntu-latest
+    runs-on: cryptowallet-host
     needs: analyse-log
     if: always()
     timeout-minutes: 5
@@ -285,7 +286,7 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   hardware-test:
     name: '5️⃣ Hardware Firmware Test'
-    runs-on: ubuntu-latest
+    runs-on: cryptowallet-host
     needs: quick-test
     if: always()
     timeout-minutes: 30
@@ -355,7 +356,7 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   report:
     name: '📋 CI Pipeline Report'
-    runs-on: ubuntu-latest
+    runs-on: cryptowallet-host
     needs: [ build, flash, analyse-log, quick-test, hardware-test ]
     if: always()
     steps:
