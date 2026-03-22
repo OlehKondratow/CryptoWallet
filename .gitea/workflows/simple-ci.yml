@@ -11,6 +11,10 @@
 # - Runner: метка cryptowallet-host:host (без docker:// для этого репозитория).
 #   Перерегистрация: GITEA_RUNNER_LABELS=cryptowallet-host:host ./infra/reregister-act-runner.sh
 # - Для HIL: ST-LINK, st-flash/st-info, UART на том же хосте, что и runner
+#
+# Сборка: шаг «Ensure ARM toolchain» проверяет arm-none-eabi-gcc / make и при отсутствии
+# ставит только нужные пакеты (apt). CI_APT_INSTALL_ARM=false — не вызывать apt, только проверка.
+# Python: см. CI_INSTALL_HOST_DEPS ниже и шаги pip/venv.
 
 name: Simple CI - Build → Flash → Test
 
@@ -19,6 +23,12 @@ on:
     branches: [ main, develop ]
   pull_request:
   workflow_dispatch:
+
+env:
+  # Python: false = только проверка импортов; true = pip/venv как в шагах ниже
+  CI_INSTALL_HOST_DEPS: 'false'
+  # ARM: true (по умолчанию) = если нет gcc/make — apt install только недостающих пакетов
+  CI_APT_INSTALL_ARM: 'true'
 
 # Явно bash для всех шагов `run:` (как в интерактивной shell).
 defaults:
@@ -36,27 +46,46 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Install ARM toolchain
+      - name: Ensure ARM toolchain (check + apt only if missing)
         run: |
-          set -eux
+          set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
-          # Job container is often root without `sudo`; support both cases.
+          echo "=== Текущее состояние ==="
+          command -v arm-none-eabi-gcc >/dev/null && arm-none-eabi-gcc --version | head -1 || echo "  arm-none-eabi-gcc: нет"
+          command -v arm-none-eabi-objcopy >/dev/null && echo "  arm-none-eabi-objcopy: ok" || echo "  arm-none-eabi-objcopy: нет"
+          command -v make >/dev/null && make --version | head -1 || echo "  make: нет"
+
+          need=()
+          command -v arm-none-eabi-gcc >/dev/null || need+=(gcc-arm-none-eabi binutils-arm-none-eabi)
+          command -v make >/dev/null || need+=(make)
+
+          if [ "${#need[@]}" -eq 0 ]; then
+            echo "✓ Тулчейн и make уже установлены, apt не нужен."
+            exit 0
+          fi
+
+          echo "=== Не хватает пакетов: ${need[*]} ==="
+
+          if [ "${CI_APT_INSTALL_ARM:-true}" != "true" ]; then
+            echo "Установите вручную: sudo apt install -y ${need[*]}"
+            echo "Или выставьте CI_APT_INSTALL_ARM=true в workflow."
+            exit 1
+          fi
+
+          echo "=== apt install (только недостающее) ==="
           if [ "$(id -u)" -eq 0 ]; then
             apt-get update -qq
-            apt-get install -y --no-install-recommends \
-              make \
-              gcc-arm-none-eabi \
-              binutils-arm-none-eabi
+            apt-get install -y --no-install-recommends "${need[@]}"
           else
             sudo apt-get update -qq
-            sudo apt-get install -y --no-install-recommends \
-              make \
-              gcc-arm-none-eabi \
-              binutils-arm-none-eabi
+            sudo apt-get install -y --no-install-recommends "${need[@]}"
           fi
+
+          command -v arm-none-eabi-gcc >/dev/null
+          command -v make >/dev/null
+          echo "✓ После установки:"
           arm-none-eabi-gcc --version | head -1
           make --version | head -1
-          echo "✓ Toolchain + make installed"
 
       - name: Build firmware
         run: |
@@ -213,9 +242,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Python
+      - name: Setup Python (pip)
+        if: ${{ env.CI_INSTALL_HOST_DEPS == 'true' }}
         run: |
           python3 -m pip install -q pyserial requests || echo "Dependencies ready"
+
+      - name: Verify Python deps on host
+        if: ${{ env.CI_INSTALL_HOST_DEPS != 'true' }}
+        run: |
+          python3 -c "import serial, requests" || { echo "pip install --user pyserial requests или CI_INSTALL_HOST_DEPS=true"; exit 1; }
 
       - name: Device connectivity check
         run: |
@@ -294,17 +329,26 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Setup Python environment
+      - name: Setup Python environment (venv + pip)
+        if: ${{ env.CI_INSTALL_HOST_DEPS == 'true' }}
         run: |
           python3 -m venv .venv
           .venv/bin/pip install -q -r requirements-test.txt
-          echo "✓ Python environment ready"
+          echo "PY=$(pwd)/.venv/bin/python3" >> "$GITHUB_ENV"
+          echo "✓ Python venv ready"
+
+      - name: Use system Python (host deps)
+        if: ${{ env.CI_INSTALL_HOST_DEPS != 'true' }}
+        run: |
+          python3 -c "import serial, requests" || { echo "На хосте: pip install --user -r requirements-test.txt или CI_INSTALL_HOST_DEPS=true"; exit 1; }
+          echo "PY=python3" >> "$GITHUB_ENV"
+          echo "✓ Using system python3"
 
       - name: RNG UART capture test
         continue-on-error: true
         run: |
           echo "🧪 Attempting RNG capture via UART..."
-          .venv/bin/python3 scripts/capture_rng_uart.py \
+          ${PY:-python3} scripts/capture_rng_uart.py \
             --port /dev/ttyACM0 \
             --out rng_test.bin \
             --bytes 1000000 \
@@ -322,6 +366,10 @@ jobs:
         run: |
           if [ -f rng_test.bin ]; then
             echo "📊 Running DIEHARDER validation..."
+            if ! command -v dieharder >/dev/null 2>&1; then
+              echo "⚠️ dieharder не в PATH (sudo apt install dieharder)"
+              exit 0
+            fi
             dieharder -f rng_test.bin -a 2>&1 | head -50 | tee dieharder_snippet.log
           else
             echo "⚠️ Skipping DIEHARDER (no RNG data)"
@@ -334,7 +382,7 @@ jobs:
           
           # Run comprehensive test if available
           if [ -f "scripts/test_rng_signing_comprehensive.py" ]; then
-            .venv/bin/python3 scripts/test_rng_signing_comprehensive.py \
+            ${PY:-python3} scripts/test_rng_signing_comprehensive.py \
               --mode signing 2>&1 | head -30 || \
             echo "⚠️ Functionality test incomplete (expected in offline CI)"
           else
