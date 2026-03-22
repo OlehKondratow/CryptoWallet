@@ -38,7 +38,11 @@ env:
   CRYPTO_DEPS_ROOT: '/data/projects'
   # HIL UART: пауза перед чтением порта в job «Analyse UART Log» (после flash)
   CI_UART_POST_FLASH_SLEEP_SEC: '4'
+  # После st-flash reset — короткая пауза перед open(COM); 4s съедает начало бут-лога
+  CI_UART_AFTER_RESET_SLEEP_SEC: '0.5'
   CI_UART_BOOT_TIMEOUT_SEC: '120'
+  # Перед чтением UART: st-flash reset (job «Analyse» идёт после flash — без сброса бут-лог уже прошёл)
+  CI_UART_ST_FLASH_RESET: '1'
   # Сборка для UART-маркеров: НЕ включать USE_RNG_DUMP (иначе UART — только бинарный RNG, без [INFO] строк)
   CI_BUILD_USE_RNG_DUMP: '0'
 
@@ -134,7 +138,10 @@ jobs:
           [ -n "${CI_FIRMWARE_SSD1306:-}" ] && export SSD1306="$CI_FIRMWARE_SSD1306"
           echo "CRYPTO_DEPS_ROOT=$CRYPTO_DEPS_ROOT (Makefile uses this for SECURE_BOOT/CUBE_ROOT/SSD1306)"
           make clean
-          make USE_RNG_DUMP=1 -j$(nproc)
+          # Должно совпадать с CI_BUILD_USE_RNG_DUMP: 1 = бинарный RNG на UART (маркеры [WALLET] не появятся)
+          RNG="${CI_BUILD_USE_RNG_DUMP:-0}"
+          echo "🔧 USE_RNG_DUMP=$RNG (0 = текстовые логи для uart_boot_markers.txt, 1 = RNG dump)"
+          make "USE_RNG_DUMP=$RNG" -j"$(nproc)"
           echo ""
           echo "✅ Build complete:"
           ls -lh build/cryptowallet.bin build/cryptowallet.elf
@@ -218,6 +225,23 @@ jobs:
           fi
           python3 -c "import serial; print('✓ pyserial OK')"
 
+      # Отдельный job после flash: без сброса бут-лог уже ушёл до открытия COM. st-flash reset даёт новую загрузку.
+      - name: Reset MCU before UART capture
+        run: |
+          set -euo pipefail
+          if [ "${CI_UART_ST_FLASH_RESET:-1}" = "0" ]; then
+            echo "⏭️  CI_UART_ST_FLASH_RESET=0 — пропуск st-flash reset"
+            exit 0
+          fi
+          if command -v st-flash >/dev/null 2>&1; then
+            echo "🔁 st-flash reset — новая загрузка, пока слушаем ${CI_UART_PORT:-/dev/ttyACM0}"
+            st-flash reset || st-flash --connect-under-reset reset || {
+              echo "⚠️  st-flash reset failed (нет ST-LINK?); UART всё равно попробуем"
+            }
+          else
+            echo "⚠️  st-flash не в PATH — установите stlink-tools или добавьте в PATH"
+          fi
+
       - name: Wait for boot log markers (UART)
         run: |
           set -euo pipefail
@@ -225,8 +249,8 @@ jobs:
           PY="${PY_UART:-python3}"
           echo "📡 UART: all service markers from scripts/ci/uart_boot_markers.txt (order irrelevant)"
           echo "   Timeout: ${CI_UART_BOOT_TIMEOUT_SEC:-120}s  port: ${CI_UART_PORT:-/dev/ttyACM0}"
-          echo "⏳ Post-flash pause: ${CI_UART_POST_FLASH_SLEEP_SEC:-4}s"
-          sleep "${CI_UART_POST_FLASH_SLEEP_SEC:-4}"
+          echo "⏳ After reset, before open(serial): ${CI_UART_AFTER_RESET_SLEEP_SEC:-0.5}s (avoid long sleep — boot log starts immediately)"
+          sleep "${CI_UART_AFTER_RESET_SLEEP_SEC:-0.5}"
           set +e
           "$PY" scripts/ci/uart_wait_boot_log.py \
             --markers-file scripts/ci/uart_boot_markers.txt \
