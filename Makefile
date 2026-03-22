@@ -8,7 +8,7 @@
 # USE_LWIP          - LwIP + Ethernet + HTTP task (default 1)
 # USE_CRYPTO_SIGN   - trezor-crypto + signing stack (default 0)
 # USE_TEST_SEED     - known test mnemonic in wallet_seed.c; forces USE_CRYPTO_SIGN
-# USE_WEBUSB        - USB device WebUSB on PA11/PA12
+# USE_WEBUSB        - USB device WebUSB on PA11/PA12 (default 1: product build = WebUSB + MVP CWUP on UART3)
 # SKIP_OLED         - skip OLED/I2C paths when display bus hangs
 # LWIP_ALIVE_LOG    - periodic UART alive from display/net tasks
 #
