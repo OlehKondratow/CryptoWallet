@@ -832,10 +832,11 @@ podman stats
 
 В `.gitea/workflows/simple-ci.yml` заданы:
 
-- **`CRYPTO_DEPS_ROOT`** (по умолчанию `/data/projects`) — родитель каталогов `stm32_secure_boot`, `STM32CubeH7`, `stm32-ssd1306`.
-- При необходимости переопределите **`CI_FIRMWARE_SECURE_BOOT`**, **`CI_FIRMWARE_CUBE_ROOT`**, **`CI_FIRMWARE_SSD1306`** в env runner или Gitea.
+- **`CRYPTO_DEPS_ROOT`** (по умолчанию `/data/projects`) — родитель каталогов `stm32_secure_boot`, `STM32CubeH7`, `stm32-ssd1306` (глобально и в job `build`).
+- **`Makefile`** читает ту же переменную: если она задана, пути к внешним деревьям берутся из `$(CRYPTO_DEPS_ROOT)/…`, иначе — из `../…` рядом с репозиторием.
+- При необходимости переопределите **`CI_FIRMWARE_SECURE_BOOT`**, **`CI_FIRMWARE_CUBE_ROOT`**, **`CI_FIRMWARE_SSD1306`** в env runner или Gitea (экспорт в шаге сборки передаётся в `make`).
 
-Корневой **`.gitmodules`** описывает `ThirdParty/trezor-crypto`; checkout с `submodules: recursive` убирает предупреждение «No url found for submodule».
+Корневой **`.gitmodules`** описывает `ThirdParty/trezor-crypto`; checkout с `submodules: recursive` убирает предупреждение «No url found for submodule» — **файл должен быть в ветке на Gitea** (закоммитьте и push).
 
 ---
 

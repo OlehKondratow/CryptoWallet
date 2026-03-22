@@ -121,12 +121,14 @@ jobs:
         run: |
           set -euo pipefail
           echo "🔨 Building firmware..."
-          DEPS_ROOT="${CRYPTO_DEPS_ROOT:-/data/projects}"
-          export SECURE_BOOT="${CI_FIRMWARE_SECURE_BOOT:-${DEPS_ROOT}/stm32_secure_boot}"
-          export CUBE_ROOT="${CI_FIRMWARE_CUBE_ROOT:-${DEPS_ROOT}/STM32CubeH7}"
-          export SSD1306="${CI_FIRMWARE_SSD1306:-${DEPS_ROOT}/stm32-ssd1306}"
+          export CRYPTO_DEPS_ROOT="${CRYPTO_DEPS_ROOT:-/data/projects}"
+          # Опциональные переопределения (редко нужны)
+          [ -n "${CI_FIRMWARE_SECURE_BOOT:-}" ] && export SECURE_BOOT="$CI_FIRMWARE_SECURE_BOOT"
+          [ -n "${CI_FIRMWARE_CUBE_ROOT:-}" ] && export CUBE_ROOT="$CI_FIRMWARE_CUBE_ROOT"
+          [ -n "${CI_FIRMWARE_SSD1306:-}" ] && export SSD1306="$CI_FIRMWARE_SSD1306"
+          echo "CRYPTO_DEPS_ROOT=$CRYPTO_DEPS_ROOT (Makefile uses this for SECURE_BOOT/CUBE_ROOT/SSD1306)"
           make clean
-          make USE_RNG_DUMP=1 SECURE_BOOT="$SECURE_BOOT" CUBE_ROOT="$CUBE_ROOT" SSD1306="$SSD1306" -j$(nproc)
+          make USE_RNG_DUMP=1 -j$(nproc)
           echo ""
           echo "✅ Build complete:"
           ls -lh build/cryptowallet.bin build/cryptowallet.elf
