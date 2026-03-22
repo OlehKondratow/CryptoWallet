@@ -13,6 +13,8 @@ Usage:
     python3 scripts/test_rng_signing_comprehensive.py --mode rng --port /dev/ttyACM0
     python3 scripts/test_rng_signing_comprehensive.py --mode signing --ip 192.168.0.10
     python3 scripts/test_rng_signing_comprehensive.py --mode verify-all
+    python3 scripts/test_rng_signing_comprehensive.py --mode verify-all --quick --skip-signing
+    python3 scripts/test_rng_signing_comprehensive.py --mode analyze --file rng.bin
 """
 
 from __future__ import annotations
@@ -271,6 +273,49 @@ class RNGTester:
 
         except Exception as e:
             print_error(f"Failed to capture RNG: {e}")
+            return False
+
+    def capture_rng_via_script(
+        self,
+        output_file: str = "rng.bin",
+        total_bytes: int = DIEHARDER_FILE_SIZE,
+    ) -> bool:
+        """Capture RNG using scripts/capture_rng_uart.py (timeouts, progress)."""
+        script_path = Path(__file__).resolve().parent / "capture_rng_uart.py"
+        if not script_path.is_file():
+            print_error(f"capture script not found: {script_path}")
+            return False
+
+        print_header("RNG Data Capture (capture_rng_uart.py)")
+        print_info(f"Port: {self.port}, script: {script_path.name}")
+        print_info(f"Target: {total_bytes / (1024 * 1024):.2f} MiB")
+
+        cmd = [
+            sys.executable,
+            str(script_path),
+            "--port",
+            self.port,
+            "--out",
+            output_file,
+            "--bytes",
+            str(total_bytes),
+        ]
+        print_info(f"Command: {' '.join(cmd)}")
+        try:
+            result = subprocess.run(cmd, check=False)
+            if result.returncode != 0:
+                print_error(f"capture_rng_uart.py exited with {result.returncode}")
+                return False
+            if not os.path.isfile(output_file):
+                print_error(f"Output file missing: {output_file}")
+                return False
+            if os.path.getsize(output_file) < 1000:
+                print_error("Captured file too small")
+                return False
+            print_success(f"Capture finished -> {output_file}")
+            return True
+        except Exception as e:
+            print_error(f"Failed to run capture script: {e}")
             return False
 
     def run_dieharder(
@@ -632,6 +677,10 @@ Examples:
 
   # Verify all systems
   %(prog)s --mode verify-all
+  %(prog)s --mode verify-all --quick --skip-signing --use-capture-script
+
+  # Analyze existing binary
+  %(prog)s --mode analyze --file rng.bin
 
   # Custom configuration
   %(prog)s --mode rng --port /dev/ttyUSB0 --bytes 268435456 --output rng_256mb.bin
@@ -640,7 +689,7 @@ Examples:
 
     parser.add_argument(
         "--mode",
-        choices=["rng", "dieharder", "signing", "verify-all"],
+        choices=["rng", "dieharder", "signing", "verify-all", "analyze"],
         default="verify-all",
         help="Test mode",
     )
@@ -674,6 +723,26 @@ Examples:
         "--test",
         type=int,
         help="Specific DIEHARDER test number",
+    )
+    parser.add_argument(
+        "--quick",
+        action="store_true",
+        help="verify-all/dieharder: 1 MiB capture + dieharder test 0 only (fast smoke)",
+    )
+    parser.add_argument(
+        "--skip-signing",
+        action="store_true",
+        help="verify-all: only RNG phases (no HTTP signing)",
+    )
+    parser.add_argument(
+        "--report",
+        default="",
+        help="verify-all: append summary to this text file",
+    )
+    parser.add_argument(
+        "--use-capture-script",
+        action="store_true",
+        help="verify-all/rng: use scripts/capture_rng_uart.py instead of built-in capture",
     )
 
     args = parser.parse_args()
@@ -713,27 +782,97 @@ Examples:
         return 1
 
     elif args.mode == "verify-all":
-        print_info("Running all tests...")
+        print_info("Running verify-all...")
         rng_tester = RNGTester(port=args.port)
         sign_tester = SigningTester(device_ip=args.ip)
 
+        report_lines: list[str] = []
+        if args.report:
+            report_lines.append(f"verify-all {datetime.now(timezone.utc).isoformat()}")
+            try:
+                git_desc = subprocess.run(
+                    ["git", "describe", "--always", "--dirty"],
+                    cwd=Path(__file__).resolve().parent.parent,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if git_desc.returncode == 0:
+                    report_lines.append(f"git: {git_desc.stdout.strip()}")
+            except Exception:
+                pass
+            report_lines.append(
+                f"quick={args.quick} skip_signing={args.skip_signing} "
+                f"use_capture_script={args.use_capture_script}"
+            )
+
+        rng_ok = False
+        dh_ok = False
+        sign_ok = True
+
         # RNG
         print_header("Phase 1: RNG Testing")
-        if rng_tester.check_prerequisites():
-            rng_tester.capture_rng_data(
+        if not rng_tester.check_prerequisites():
+            print_error("RNG prerequisites failed")
+            if args.report:
+                report_lines.append("prerequisites: FAIL")
+                Path(args.report).write_text("\n".join(report_lines) + "\n", encoding="utf-8")
+            return 1
+
+        capture_ok = (
+            rng_tester.capture_rng_via_script(args.output, cap_bytes)
+            if args.use_capture_script
+            else rng_tester.capture_rng_data(
                 output_file=args.output,
-                total_bytes=args.bytes,
+                total_bytes=cap_bytes,
             )
+        )
+        rng_ok = capture_ok
+        if capture_ok:
             rng_tester.analyze_rng_quality(args.output)
-            rng_tester.run_dieharder(input_file=args.output)
+            if args.test is not None:
+                d_test = args.test
+                d_all = False
+            elif args.quick:
+                d_test = 0
+                d_all = False
+            else:
+                d_test = None
+                d_all = True
+            dh_ok = rng_tester.run_dieharder(
+                input_file=args.output,
+                test_num=d_test,
+                all_tests=d_all,
+            )
+        else:
+            print_error("RNG capture failed — skipping analysis/dieharder")
 
-        # Signing
-        print_header("Phase 2: Signing Testing")
-        if sign_tester.check_device_connectivity():
-            sign_tester.test_transaction_signing()
-            sign_tester.test_deterministic_signing()
+        if not args.skip_signing:
+            print_header("Phase 2: Signing Testing")
+            if sign_tester.check_device_connectivity():
+                s1 = sign_tester.test_transaction_signing()
+                s2 = sign_tester.test_deterministic_signing()
+                sign_ok = bool(s1 and s2)
+            else:
+                sign_ok = False
+        else:
+            print_info("Skipping signing tests (--skip-signing)")
 
-        return 0
+        exit_code = 0
+        if not rng_ok or not dh_ok:
+            exit_code = 1
+        if not args.skip_signing and not sign_ok:
+            exit_code = 1
+
+        if args.report:
+            report_lines.append(f"rng_capture: {'OK' if rng_ok else 'FAIL'}")
+            report_lines.append(f"dieharder: {'OK' if dh_ok else 'FAIL'}")
+            report_lines.append(f"signing: {'OK' if sign_ok else 'FAIL' if not args.skip_signing else 'SKIPPED'}")
+            report_lines.append(f"exit_code: {exit_code}")
+            with open(args.report, "a", encoding="utf-8") as rf:
+                rf.write("\n".join(report_lines) + "\n")
+
+        return exit_code
 
     return 0
 

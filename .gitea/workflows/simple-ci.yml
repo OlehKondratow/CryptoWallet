@@ -47,6 +47,10 @@ env:
   CI_RNG_STALL_TIMEOUT_SEC: '180'
   CI_RNG_PROGRESS_INTERVAL_SEC: '5'
   CI_RNG_CAPTURE_BYTES: '1000000'
+  # Минимальный размер rng_test.bin для dieharder (иначе утилита подставляет свой PRNG — не МК)
+  CI_RNG_DIEHARDER_MIN_BYTES: '262144'
+  # 0 = один быстрый тест (-d 0); 1 = полный dieharder -a (очень долго, лог в dieharder_full.log)
+  CI_RNG_DIEHARDER_FULL: '0'
   # Пропустить долгий RNG-шаг (например прошивка без USE_RNG_DUMP=1): CI_SKIP_RNG_UART_CAPTURE=1
   CI_SKIP_RNG_UART_CAPTURE: '0'
 
@@ -304,7 +308,8 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   quick-test:
     name: '4️⃣ Quick Preliminary Test'
-    runs-on: cryptowallet-host
+    # Список для совместимости с частью парсеров act/Gitea ('runs-on' not defined)
+    runs-on: [cryptowallet-host]
     needs: analyse-log
     if: always()
     timeout-minutes: 5
@@ -458,16 +463,42 @@ jobs:
       - name: Quick DIEHARDER validation (if data available)
         continue-on-error: true
         run: |
-          if [ -f rng_test.bin ]; then
-            echo "📊 Running DIEHARDER validation..."
-            if ! command -v dieharder >/dev/null 2>&1; then
-              echo "⚠️ dieharder не в PATH (sudo apt install dieharder)"
-              exit 0
-            fi
-            dieharder -f rng_test.bin -a 2>&1 | head -50 | tee dieharder_snippet.log
-          else
-            echo "⚠️ Skipping DIEHARDER (no RNG data)"
+          set -euo pipefail
+          MIN="${CI_RNG_DIEHARDER_MIN_BYTES:-262144}"
+          if [ ! -f rng_test.bin ]; then
+            echo "⚠️ Skipping DIEHARDER (нет rng_test.bin)"
+            echo "skipped: no rng_test.bin" > dieharder_snippet.log
+            exit 0
           fi
+          SIZE=$(stat -f%z rng_test.bin 2>/dev/null || stat -c%s rng_test.bin)
+          if [ "$SIZE" -lt "$MIN" ]; then
+            echo "⚠️ Skipping DIEHARDER: rng_test.bin слишком мал ($SIZE байт, нужно ≥ $MIN)."
+            echo "При пустом/коротком файле dieharder подставляет свой генератор (не данные с МК)."
+            echo "skipped: size $SIZE < min $MIN (нужна прошивка USE_RNG_DUMP=1 и успешный RNG capture)" > dieharder_snippet.log
+            exit 0
+          fi
+          if ! command -v dieharder >/dev/null 2>&1; then
+            echo "⚠️ dieharder не в PATH (sudo apt install dieharder)"
+            echo "skipped: dieharder not installed" > dieharder_snippet.log
+            exit 0
+          fi
+          echo "📊 DIEHARDER on $SIZE bytes (min $MIN)..."
+          set +e
+          if [ "${CI_RNG_DIEHARDER_FULL:-0}" = "1" ]; then
+            echo "   (режим FULL -a — может занять десятки минут)"
+            dieharder -a -g 201 -f rng_test.bin > dieharder_full.log 2>&1
+            dh_rc=$?
+            head -120 dieharder_full.log | tee dieharder_snippet.log
+            echo "dieharder exit code: $dh_rc (см. dieharder_full.log)"
+          else
+            echo "   (быстрый smoke: -d 0 -g 201 -f …; полный -a: CI_RNG_DIEHARDER_FULL=1)"
+            dieharder -d 0 -g 201 -f rng_test.bin > dieharder_snippet.log 2>&1
+            dh_rc=$?
+            cat dieharder_snippet.log
+            echo "dieharder exit code: $dh_rc"
+          fi
+          set -e
+          exit 0
 
       - name: Firmware functionality test
         continue-on-error: true

@@ -5,6 +5,8 @@
 **Версия:** 1.0  
 **Статус:** ✅ Готов к использованию
 
+**См. также:** [RNG_ENTROPY_SOURCES_RU.md](RNG_ENTROPY_SOURCES_RU.md) — источники энтропии; [RNG_THREAT_MODEL_P2_RU.md](RNG_THREAT_MODEL_P2_RU.md) — модель угроз и практики (P2).
+
 ---
 
 ## 📋 Оглавление
@@ -351,18 +353,49 @@ python3 scripts/test_rng_signing_comprehensive.py --mode signing --ip 192.168.0.
 
 ## 🧪 Полное тестирование (все системы)
 
-```bash
-# Автоматически запустит:
-# 1. Проверка RNG (entropy analysis)
-# 2. Захват RNG (128 MiB с UART)
-# 3. DIEHARDER тесты (все)
-# 4. Проверка подписания
-# 5. Тест детерминизма
+### Режим `verify-all` (один процесс)
 
+Автоматически:
+
+1. Проверка prerequisites (pyserial, dieharder, порт)
+2. Захват RNG с UART (по умолчанию 128 MiB)
+3. Анализ энтропии (встроенный)
+4. DIEHARDER (`-a` для полного прогона)
+5. Опционально: HTTP-подписание и детерминизм
+
+```bash
+# Полный цикл RNG + dieharder + подписание (долго)
 python3 scripts/test_rng_signing_comprehensive.py --mode verify-all
+
+# Быстрый smoke: 1 MiB + один тест dieharder, без подписания
+python3 scripts/test_rng_signing_comprehensive.py --mode verify-all --quick --skip-signing
+
+# Захват через scripts/capture_rng_uart.py (таймауты/прогресс, рекомендуется)
+python3 scripts/test_rng_signing_comprehensive.py --mode verify-all --use-capture-script --skip-signing
+
+# Сводка в файл
+python3 scripts/test_rng_signing_comprehensive.py --mode verify-all --skip-signing --report rng_verify_report.txt
 ```
 
-**Ожидаемое время:** 3-5 часов
+**Ожидаемое время:** полный dieharder — **часы**; `--quick` — **минуты**.
+
+### Лабораторный сценарий: `run_full_rng_verification.sh`
+
+Отдельный bash-скрипт: **`capture_rng_uart.py`** → **`--mode analyze`** → **`--mode dieharder`**. Удобно для артефактов (`rng_full_verify.bin`, `rng_full_verify_report.txt`).
+
+```bash
+chmod +x scripts/run_full_rng_verification.sh
+./scripts/run_full_rng_verification.sh
+QUICK=1 ./scripts/run_full_rng_verification.sh
+CI_UART_PORT=/dev/ttyUSB0 RNG_CAPTURE_BYTES=134217728 ./scripts/run_full_rng_verification.sh
+```
+
+### Анализ уже сохранённого файла
+
+```bash
+python3 scripts/test_rng_signing_comprehensive.py --mode analyze --file rng.bin
+python3 scripts/test_rng_signing_comprehensive.py --mode dieharder --file rng.bin --quick
+```
 
 ---
 
