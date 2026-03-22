@@ -42,6 +42,13 @@ env:
   CI_UART_ST_FLASH_RESET: '1'
   # Сборка для UART-маркеров: НЕ включать USE_RNG_DUMP (иначе UART — только бинарный RNG, без [INFO] строк)
   CI_BUILD_USE_RNG_DUMP: '0'
+  # scripts/capture_rng_uart.py: таймауты и прогресс (см. --help / CI_RNG_* в скрипте)
+  CI_RNG_FIRST_BYTE_TIMEOUT_SEC: '90'
+  CI_RNG_STALL_TIMEOUT_SEC: '180'
+  CI_RNG_PROGRESS_INTERVAL_SEC: '5'
+  CI_RNG_CAPTURE_BYTES: '1000000'
+  # Пропустить долгий RNG-шаг (например прошивка без USE_RNG_DUMP=1): CI_SKIP_RNG_UART_CAPTURE=1
+  CI_SKIP_RNG_UART_CAPTURE: '0'
 
 # Явно bash для всех шагов `run:` (как в интерактивной shell).
 defaults:
@@ -410,19 +417,43 @@ jobs:
       - name: RNG UART capture test
         continue-on-error: true
         run: |
-          echo "🧪 Attempting RNG capture via UART..."
+          set -euo pipefail
+          echo "═══════════════════════════════════════════════════════════════════"
+          echo "🧪 RNG UART capture (scripts/capture_rng_uart.py)"
+          echo "   Ожидается бинарный поток с МК (USE_RNG_DUMP=1 в прошивке)."
+          echo "   В этом pipeline сборка по умолчанию: CI_BUILD_USE_RNG_DUMP=0 → на UART"
+          echo "   обычно текстовые логи; тогда захват прервётся по таймауту первого байта"
+          echo "   (${CI_RNG_FIRST_BYTE_TIMEOUT_SEC:-90}s) — это ожидаемо, пока не прошьёте RNG-сборку."
+          echo "   Пропуск шага: CI_SKIP_RNG_UART_CAPTURE=1 на runner."
+          echo "═══════════════════════════════════════════════════════════════════"
+          if [ "${CI_SKIP_RNG_UART_CAPTURE:-0}" = "1" ]; then
+            echo "⏭️  CI_SKIP_RNG_UART_CAPTURE=1 — пропуск захвата RNG"
+            : > rng_test.bin
+            ls -la rng_test.bin
+            exit 0
+          fi
+          cap_rc=1
+          set +e
           ${PY:-python3} scripts/capture_rng_uart.py \
-            --port /dev/ttyACM0 \
+            --port "${CI_UART_PORT:-/dev/ttyACM0}" \
             --out rng_test.bin \
-            --bytes 1000000 \
-            2>&1 || echo "⚠️ RNG capture failed (device may not be running)"
-          
+            --bytes "${CI_RNG_CAPTURE_BYTES:-1000000}" \
+            --first-byte-timeout "${CI_RNG_FIRST_BYTE_TIMEOUT_SEC:-90}" \
+            --stall-timeout "${CI_RNG_STALL_TIMEOUT_SEC:-180}" \
+            --progress-interval "${CI_RNG_PROGRESS_INTERVAL_SEC:-5}" \
+            2>&1
+          cap_rc=$?
+          set -e
           if [ -f rng_test.bin ]; then
             SIZE=$(stat -f%z rng_test.bin 2>/dev/null || stat -c%s rng_test.bin)
-            echo "✓ Captured $SIZE bytes"
+            echo "📦 rng_test.bin size: $SIZE bytes (exit code from capture: $cap_rc)"
+            if [ "$SIZE" -eq 0 ] || [ "$cap_rc" -ne 0 ]; then
+              echo "⚠️ RNG capture incomplete or failed (см. лог выше; для полного захвата нужна прошивка USE_RNG_DUMP=1)"
+            fi
           else
-            echo "⚠️ No RNG data captured"
+            echo "⚠️ rng_test.bin не создан — ошибка до открытия порта"
           fi
+          exit "$cap_rc"
 
       - name: Quick DIEHARDER validation (if data available)
         continue-on-error: true

@@ -16,7 +16,9 @@
  *          **Usage:**
  *          - Build with: make USE_RNG_DUMP=1
  *          - Flash to device: make flash
- *          - Capture on PC: python3 -m serial.tools.miniterm /dev/ttyACM0 115200 --raw > rng.bin
+ *          - Capture on PC: python3 scripts/capture_rng_uart.py --out rng.bin --bytes ...
+ *          - CI: main pipeline uses CI_BUILD_USE_RNG_DUMP=0 by default (text UART for boot
+ *            markers). RNG capture job needs a firmware built with USE_RNG_DUMP=1 on the board.
  *          - Test: dieharder -a -g 201 -f rng.bin
  ******************************************************************************
  */
