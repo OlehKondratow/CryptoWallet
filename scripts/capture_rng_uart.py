@@ -2,7 +2,7 @@
 """
 Capture raw random bytes from the device UART into a binary file for DIEHARDER.
 
-Doc index: README.md (repo root). RNG background: docs_src/rng-entropy.md .
+Doc: README.md; RNG/CI context: documentation/06-integrity-rng-verification.md
 
 Prerequisites on the device
 ---------------------------

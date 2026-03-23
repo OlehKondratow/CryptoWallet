@@ -7,7 +7,7 @@ Documentation index: repository README.md (maps this script to firmware + docs).
 Print markdown to stdout or write to a file (run from project root):
 
   python3 scripts/test_plan_signing_rng.py
-  python3 scripts/test_plan_signing_rng.py --write docs_src/testing-plan-signing-rng.md
+  python3 scripts/test_plan_signing_rng.py --write documentation/generated/testing-plan-signing-rng.md
 
 ``make docs`` invokes this script before MkDocs build.
 """
@@ -25,14 +25,14 @@ PLAN_SECTIONS = [
         "items": [
             "Bitcoin-style signing path m/44'/0'/0'/0/0 (project default).",
             "Message signed: SHA-256(recipient|amount|currency) then ECDSA secp256k1 compact 64-byte sig — not a raw Bitcoin tx.",
-            "RNG: STM32 TRNG + software pool (see docs_src/rng-entropy.md).",
+            "RNG: STM32 TRNG + software pool (see documentation/03-cryptography-and-signing.md).",
         ],
     },
     {
         "title": "2. Bitcoin signing — prerequisites",
         "items": [
             "Build: USE_CRYPTO_SIGN=1, USE_TEST_SEED=1 for known vector (dev only).",
-            "Flash firmware; Ethernet or WebUSB per docs_src/testing-signing.md.",
+            "Flash firmware; Ethernet or WebUSB per documentation/04-http-and-webusb.md.",
             "UART 115200 for logs (optional but recommended).",
         ],
     },
@@ -77,8 +77,7 @@ PLAN_SECTIONS = [
     {
         "title": "7. Traceability",
         "items": [
-            "Detailed steps: docs_src/verification-signing.md, docs_src/testing-signing.md.",
-            "RNG details: docs_src/rng-entropy.md.",
+            "Design reference: documentation/03-cryptography-and-signing.md, 04-http-and-webusb.md, 06-integrity-rng-verification.md.",
         ],
     },
 ]

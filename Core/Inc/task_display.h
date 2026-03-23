@@ -6,7 +6,7 @@
   * @details
   *          **Role:** Defines how @c task_net , @c task_sign , and others push UI data:
   *          @c Transaction_Data_t on @c g_display_queue ; @c Task_Display_Log() writes
-  *          UART + scrollable log line (see @c docs_src/architecture.md ).
+  *          UART + scrollable log line (see @c documentation/02-firmware-structure.md ).
   *
   *          **USER confirm** is not in this module — @c task_user.c sets event bits
   *          consumed by @c task_sign.c .

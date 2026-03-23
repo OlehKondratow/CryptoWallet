@@ -25,7 +25,7 @@
   *          @c task_security.c if enabled).
   *          **Output signature:** @c g_last_sig[64] , @c g_last_sig_ready .
   *
-  *          Diagram + coding notes: @c docs_src/architecture.md .
+  *          Diagram + coding notes: @c documentation/02-firmware-structure.md .
   ******************************************************************************
   */
 

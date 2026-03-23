@@ -9,7 +9,7 @@
   *          @c EVENT_USER_CONFIRMED ; ~2.5 s hold → @c EVENT_USER_REJECTED .
   *          Debounce 50 ms; @c task_sign.c waits on @c g_user_event_group .
   *
-  *          **Docs:** @c docs_src/testing-signing.md , @c docs_src/architecture.md .
+  *          **Docs:** @c documentation/06-integrity-rng-verification.md , @c documentation/02-firmware-structure.md .
   ******************************************************************************
   */
 

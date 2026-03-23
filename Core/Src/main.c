@@ -25,7 +25,7 @@
   *          **Hooks:** @c vApplicationMallocFailedHook , @c vApplicationStackOverflowHook ,
   *          @c Error_Handler .
   *
-  *          See @c docs_src/architecture.md , repository @c README.md .
+  *          See documentation/02-firmware-structure.md and repository @c README.md .
   ******************************************************************************
   */
 

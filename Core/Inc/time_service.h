@@ -6,7 +6,7 @@
   * @details
   *          Call @c time_service_init() before @c tcpip_init ; @c time_service_start()
   *          after Ethernet link up. Feeds wallet logs / UI time strings; see
-  *          @c time_service.c and @c docs_src/architecture.md (support modules).
+  *          @c time_service.c and @c documentation/02-firmware-structure.md (support modules).
   ******************************************************************************
   */
 

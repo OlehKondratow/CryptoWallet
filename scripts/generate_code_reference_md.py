@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Generate docs_src/reference-code.md from file-level Doxygen headers and Python docstrings.
+Generate documentation/generated/reference-code.md from file-level Doxygen headers and Python docstrings.
 
-See docs_src/code-doc-generation.md for design and alternatives.
+See documentation/MAINTENANCE.md for tooling.
 """
 
 from __future__ import annotations
@@ -176,8 +176,8 @@ def main() -> int:
         "-o",
         "--output",
         type=Path,
-        default=Path("docs_src/reference-code.md"),
-        help="Output Markdown path (default: docs_src/reference-code.md)",
+        default=Path("documentation/generated/reference-code.md"),
+        help="Output Markdown path (default: documentation/generated/reference-code.md)",
     )
     ap.add_argument(
         "--root",

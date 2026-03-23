@@ -36,11 +36,11 @@ def get_language_suffix(lang: str) -> str:
     return f"_{lang}"
 
 def main():
-    docs_dir = Path("docs_src")
+    docs_dir = Path("documentation")
     readme = Path("README.md")
     
     print("Creating language versions...")
-    print(f"Found {len(list(docs_dir.glob('*.md')))} docs in docs_src/")
+    print(f"Found {len(list(docs_dir.glob('*.md')))} docs in documentation/")
     print(f"Found README.md")
     print()
     print("To create full translations, use:")

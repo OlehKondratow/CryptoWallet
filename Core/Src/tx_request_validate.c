@@ -6,7 +6,7 @@
   * @details
   *          Whitelist currencies, Base58 checks for BTC-style addresses, numeric
   *          amount rules. Used from task_net.c (HTTP), usb_webusb.c (WebUSB), and
-  *          task_sign.c. **Messages:** docs_src/crypto-messages.md .
+  *          task_sign.c. **Messages:** documentation/03-cryptography-and-signing.md .
   ******************************************************************************
   */
 

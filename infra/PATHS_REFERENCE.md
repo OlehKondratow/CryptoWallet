@@ -35,7 +35,7 @@
 ├── build/                        # Build outputs
 ├── Core/                         # Source code
 ├── .gitea/workflows/            # CI/CD workflows
-└── docs_src/                     # Documentation
+└── documentation/                # Canonical manual + generated snippets
 ```
 
 ### Build Artifacts (Local)

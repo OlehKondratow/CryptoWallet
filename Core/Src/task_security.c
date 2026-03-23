@@ -10,7 +10,7 @@
   *          comparison with Trezor-style FSM (IDLE→RECEIVED→WAIT_CONFIRM→…).
   *
   *          Uses @c memzero() for sensitive buffers; confirm timeout 30 s.
-  *          **Docs:** @c docs_src/architecture.md (task table + data-flow).
+  *          **Docs:** @c documentation/02-firmware-structure.md (task table + data-flow).
   ******************************************************************************
   */
 

@@ -183,7 +183,7 @@ def main() -> int:
         if kind != "file":
             continue
         # Only code headers/sources should go into the "Project Structure" table.
-        # We intentionally ignore Markdown pages from `docs_src/`.
+        # We intentionally ignore Markdown pages (manual lives in `documentation/`, built with MkDocs).
         if not str(path).lower().endswith((".c", ".h")):
             continue
         # Prefer relative path for display

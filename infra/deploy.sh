@@ -155,7 +155,7 @@ case "${1:-menu}" in
     echo "  build-runner      Rebuild runner image"
     echo "  clean             Remove all data (DESTRUCTIVE)"
     echo ""
-    echo "See docs_src/infrastructure.md for complete documentation"
+    echo "See documentation/07-build-ci-infrastructure.md and infra/docker-compose.yml"
     echo ""
     ;;
 esac

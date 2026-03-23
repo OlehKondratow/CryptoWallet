@@ -8,10 +8,10 @@
   *          **When @c USE_CRYPTO_SIGN=0 :** hashing helpers fall back to @c sha256_minimal.c .
   *
   *          **Makefile** links selected @c ThirdParty/trezor-crypto objects (see @c Makefile ).
-  *          **Entropy / testing:** @c docs_src/rng-entropy.md , @c scripts/capture_rng_uart.py ,
+  *          **Entropy / testing:** @c documentation/06-integrity-rng-verification.md , @c scripts/capture_rng_uart.py ,
   *          @c scripts/run_dieharder.py .
   *
-  *          **Integration overview:** @c docs_src/trezor-crypto-integration.md .
+  *          **Integration overview:** @c documentation/03-cryptography-and-signing.md .
   ******************************************************************************
   */
 

@@ -1,4 +1,4 @@
-# Локальные копии логов CI / UART с runner (см. docs_src/INFRASTRUCTURE.md)
+# Локальные копии логов CI / UART с runner (см. documentation/07-build-ci-infrastructure.md)
 logs/ci/
 
 # Build outputs
@@ -48,7 +48,7 @@ __pycache__/
 .pytest_cache/
 *.egg-info/
 .eggs/
-docs/
+site/
 docs_doxygen/
 
 # IDE / editor

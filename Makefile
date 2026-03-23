@@ -18,7 +18,7 @@
 # flash-minimal-lwip - flash minimal image
 # boottest / flash-boottest - no FreeRTOS diagnostic
 # secure-signing-test - Python smoke (see scripts/bootloader_secure_signing_test.py)
-# docs / docs-serve  - MkDocs (regenerates testing-plan-signing-rng.md)
+# docs / docs-serve — MkDocs: documentation/*.md → site/ (see mkdocs.yml)
 #
 # USE_LWIP=1 enables LwIP Ethernet + HTTP server (default: enabled)
 
@@ -160,24 +160,23 @@ MKDOCS = $(if $(wildcard .venv-docs/bin/mkdocs),.venv-docs/bin/mkdocs,mkdocs)
 PYTHON3 ?= python3
 docs:
 	@$(MKDOCS) --version >/dev/null 2>&1 || { echo "Install: python3 -m venv .venv-docs && .venv-docs/bin/pip install -r requirements-docs.txt"; exit 1; }
-	@echo "Regenerating docs_src/testing-plan-signing-rng.md ..."
-	@$(PYTHON3) scripts/test_plan_signing_rng.py --write docs_src/testing-plan-signing-rng.md
-	@echo "Regenerating docs_src/reference-code.md from source headers ..."
-	@$(PYTHON3) scripts/generate_code_reference_md.py -o docs_src/reference-code.md
-	$(MKDOCS) build
-	@echo "Docs: docs/index.html"
+	@$(MAKE) docs-md
+	$(MKDOCS) build -f mkdocs.yml
+	@echo "Docs: site/index.html"
 
-# Markdown only: regenerate generated .md (no MkDocs / no docs/ HTML)
+# Markdown only: regenerate documentation/generated/*.md (no HTML)
 docs-md:
-	@echo "Regenerating docs_src/testing-plan-signing-rng.md ..."
-	@$(PYTHON3) scripts/test_plan_signing_rng.py --write docs_src/testing-plan-signing-rng.md
+	@mkdir -p documentation/generated
+	@echo "Regenerating documentation/generated/testing-plan-signing-rng.md ..."
+	@$(PYTHON3) scripts/test_plan_signing_rng.py --write documentation/generated/testing-plan-signing-rng.md
 	@$(MAKE) docs-code-md
-	@echo "OK: generated docs_src/*.md; run 'make docs' for HTML site."
+	@echo "OK: generated documentation/generated/*.md; run 'make docs' for site/."
 
-# Code headers → docs_src/reference-code.md (see docs_src/code-doc-generation.md)
+# Code headers → documentation/generated/reference-code.md
 docs-code-md:
-	@echo "Regenerating docs_src/reference-code.md ..."
-	@$(PYTHON3) scripts/generate_code_reference_md.py -o docs_src/reference-code.md
+	@mkdir -p documentation/generated
+	@echo "Regenerating documentation/generated/reference-code.md ..."
+	@$(PYTHON3) scripts/generate_code_reference_md.py -o documentation/generated/reference-code.md
 
 # Doxygen: XML + HTML; then update README "Project Structure" and optionally emit .md per file
 docs-doxygen:
@@ -185,14 +184,11 @@ docs-doxygen:
 	doxygen Doxyfile
 	@$(PYTHON3) scripts/update_readme.py
 	@$(PYTHON3) scripts/update_readme.py --md-dir docs_doxygen/md
-	@$(PYTHON3) scripts/update_docs_src_index.py
-	@$(PYTHON3) scripts/generate_readme_languages.py
-	@echo "Doxygen: docs_doxygen/html, docs_doxygen/xml; README sections updated (Project Structure + docs_src index); docs_doxygen/md/*.md"
-	@echo "README: Generated in English, Russian, Polish (README.md, README_ru.md, README_pl.md)"
+	@echo "Doxygen: docs_doxygen/html, docs_doxygen/xml; README Project Structure updated; docs_doxygen/md/*.md"
 
 # Serve docs locally (live reload)
 docs-serve:
-	$(MKDOCS) serve
+	$(MKDOCS) serve -f mkdocs.yml
 
 # Minimal + LwIP: use lwip_zero startup+system (same as working lwip_zero)
 LWIP_STARTUP = $(LWIP_CUBE)/Drivers/CMSIS/Device/ST/STM32H7xx/Source/Templates/gcc/startup_stm32h743xx.s

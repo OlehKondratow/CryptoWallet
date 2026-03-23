@@ -2,7 +2,7 @@
 """
 Test script for transaction signing over WebUSB.
 
-Documentation index: README.md (repo root). Protocol notes: Core/Src/usb_webusb.c , docs_src/webusb.md .
+Doc: documentation/04-http-and-webusb.md ; firmware: Core/Src/usb_webusb.c .
 
 Requirements:
   pip install -r scripts/requirements.txt   # pyusb (+ pyserial for other scripts)

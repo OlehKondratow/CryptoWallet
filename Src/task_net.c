@@ -10,12 +10,12 @@
   *          **HTTP:** Port 80. Body JSON or form: recipient, amount, currency.
   *          Validated via @c tx_request_validate.c , then @c wallet_tx_t to
   *          @c g_tx_queue → @c task_sign.c (not @c task_security.c ).
-  *          HTTP API spec: @c docs_src/HTTP_API_ru.md , @c docs_src/HTTP_API_en.md .
+  *          HTTP API spec: @c documentation/04-http-and-webusb.md .
   *
   *          **IP:** DHCP with static fallback (e.g. 192.168.0.10) in @c main.h .
   *          **Build:** @c USE_LWIP ; BSP from Cube / @c stm32_secure_boot template paths.
   *
-  *          **Tests:** @c docs_src/testing-signing.md , @c scripts/bootloader_secure_signing_test.py .
+  *          **Tests:** @c documentation/06-integrity-rng-verification.md , @c scripts/bootloader_secure_signing_test.py .
   ******************************************************************************
   */
 

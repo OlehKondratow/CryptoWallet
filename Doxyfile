@@ -59,7 +59,7 @@ GENERATE_XML           = YES
 XML_OUTPUT             = xml
 XML_PROGRAMLISTING     = YES
 # ----- Input -----
-INPUT                  = Core/Src Core/Inc Src Drivers/ssd1306 docs_src
+INPUT                  = Core/Src Core/Inc Src Drivers/ssd1306
 FILE_PATTERNS          = *.c *.h *.md
 RECURSIVE              = YES
 EXCLUDE                = ThirdParty/ \

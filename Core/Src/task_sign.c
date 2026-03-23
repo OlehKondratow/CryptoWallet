@@ -16,7 +16,7 @@
   *          **Crypto:** @c crypto_wallet.c / trezor-crypto when @c USE_CRYPTO_SIGN .
   *
   *          Original wallet logic; no code copied from trezor-firmware.
-  *          **Docs:** @c docs_src/verification-signing.md , @c docs_src/crypto-messages.md .
+  *          **Docs:** @c documentation/03-cryptography-and-signing.md , @c documentation/03-cryptography-and-signing.md .
   ******************************************************************************
   */
 

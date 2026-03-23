@@ -5,7 +5,7 @@
   ******************************************************************************
   * @details
   *          STM32H743ZI2 (Nucleo-144). **Documentation index:** repository @c README.md .
-  *          **Pinout table:** @c Core/Src/hw_init.c and @c docs_src/pinout.md .
+  *          **Pinout table:** @c Core/Src/hw_init.c and @c Core/Src/hw_init.c .
   *
   *          Adjust @c IP_ADDR0..3 , netmask, gateway for your LAN; DHCP vs static in
   *          @c Core/Inc/lwipopts.h .

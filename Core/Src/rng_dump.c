@@ -17,7 +17,7 @@
  *          - Build with: make USE_RNG_DUMP=1
  *          - Flash to device: make flash
  *          - Capture on PC: python3 scripts/capture_rng_uart.py --out rng.bin --bytes ...
- *          - CI: see docs_src/CI_PIPELINE_ru.md — default build uses USE_RNG_DUMP=1 for TRNG capture.
+ *          - CI: see documentation/06-integrity-rng-verification.md — default build uses USE_RNG_DUMP=1 for TRNG capture.
  *          - Test: dieharder -a -g 201 -f rng.bin
  ******************************************************************************
  */

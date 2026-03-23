@@ -2,7 +2,7 @@
 """
 Run dieharder on a binary file of raw random bytes (generator 201 = file_input_raw).
 
-Doc index: README.md (repo root). Workflow: docs_src/rng-entropy.md , scripts/capture_rng_uart.py .
+Doc: documentation/06-integrity-rng-verification.md ; capture: scripts/capture_rng_uart.py .
 
 Install (Debian/Ubuntu):
   sudo apt install dieharder

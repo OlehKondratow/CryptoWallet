@@ -151,7 +151,7 @@ class RNGTester:
                 print("   - Linux (Debian):   sudo apt install dieharder")
                 print("   - Linux (Fedora):   sudo dnf install dieharder")
                 print("   - macOS:            brew install dieharder")
-                print("   Or run: ./install-test-deps.sh\n")
+                print("   Or run: ./scripts/install-test-deps.sh\n")
             
             if not checks["serial port"]:
                 print_error(f"❌ Serial port not found ({self.port}):")
@@ -159,7 +159,7 @@ class RNGTester:
                 print("   - For multi-device, use: --port /dev/ttyUSB0\n")
             
             print_error("="*70)
-            print_error("See docs_src/INSTALL_TEST_DEPS.md for complete instructions")
+            print_error("See documentation/07-build-ci-infrastructure.md and ./scripts/install-test-deps.sh")
             print_error("="*70)
             return False
 

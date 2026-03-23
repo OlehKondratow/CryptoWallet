@@ -15,7 +15,7 @@
   *          **Clean-code note:** @c display_task / @c render_four_scroll_lines are long;
   *          acceptable for embedded; could be split further.
   *
-  *          **Docs:** @c docs_src/architecture.md , @c README.md .
+  *          **Docs:** @c documentation/02-firmware-structure.md , @c README.md .
   ******************************************************************************
   */
 

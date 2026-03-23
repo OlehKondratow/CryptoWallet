@@ -8,7 +8,7 @@
   *          **Framing:** command byte + payload; responses include status + 64-byte
   *          ECDSA compact sig when applicable.
   *
-  *          **Host tools:** @c scripts/test_usb_sign.py (pyusb). **Docs:** @c docs_src/webusb.md ,
+  *          **Host tools:** @c scripts/test_usb_sign.py (pyusb). **Docs:** @c documentation/04-http-and-webusb.md ,
   *          @c udev/99-cryptowallet-webusb.rules on Linux.
   *
   *          Guarded by @c USE_WEBUSB .
