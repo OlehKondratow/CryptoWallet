@@ -22,6 +22,8 @@
 
 `scripts/capture_rng_uart.py` captures **raw** bytes for dieharder-style analysis when `USE_RNG_DUMP=1`.
 
+**Cryptographic use vs this capture path:** UART dump exists to **verify** the TRNG statistically. **Provisioning** a future encrypted wallet blob (salts, AEAD nonces) must use the **same hardware RNG inside firmware**, not the host file produced by capture—see **section 3.5** of [`03-cryptography-and-signing.md`](03-cryptography-and-signing.md) (TRNG role, UID binding, `USE_RNG_DUMP` scope).
+
 ## 6.3 Host tests (no board)
 
 - **`pytest tests/mvp`** — CRC/build checks, FWINFO parsing, secure boot image tamper logic (`ecdsa` from `requirements-test.txt`).

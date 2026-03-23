@@ -17,6 +17,7 @@ nav:
   - "6. Integrity, RNG, verification": 06-integrity-rng-verification.md
   - "7. Build, CI, infra": 07-build-ci-infrastructure.md
   - Maintenance: MAINTENANCE.md
+  - Translations: lang/README.md
   - Generated:
       - Code reference: generated/reference-code.md
       - Test plan (signing/RNG): generated/testing-plan-signing-rng.md
