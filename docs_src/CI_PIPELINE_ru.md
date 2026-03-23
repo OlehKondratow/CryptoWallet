@@ -27,17 +27,7 @@
 
 Переменные workflow: `CI_CWUP_STRESS_ROUNDS`, `CI_CWUP_READY_TIMEOUT_SEC`, `CI_CWUP_SKIP_NO_DEVICE` (см. `.gitea/workflows/simple-ci.yml`).
 
-### Отдельный workflow: автоматическая проверка CWUP AT (рекомендуется)
-
-Файл **`.gitea/workflows/cwup-mvp-ci.yml`** — при **каждом** push/PR в `main`/`develop` и по **расписанию** (cron `15 4 * * *`, можно удалить блок `schedule`, если не нужна ночная проверка):
-
-1. Сборка **`USE_RNG_DUMP=0`** (CWUP активен на UART).
-2. `pytest tests/mvp`.
-3. Прошивка артефакта и **`scripts/test_cwup_mvp.py`** (`--bin`, стресс).
-
-Так проверяются AT-команды **без** переключения основного Simple CI на RNG=0. С **Simple CI** используется общая **concurrency**-группа `cryptowallet-stlink-${{ github.repository }}`, чтобы не держать ST-LINK двумя pipeline одновременно.
-
-Ручной запуск: **Actions → CWUP MVP - AT commands HIL → Run workflow**.
+Отдельного workflow только под CWUP в репозитории нет: HIL на UART — через **тот же Simple CI** (ручной **Run workflow** с `ci_build_use_rng_dump=0` или шаг «Analyse UART Log», когда сборка в текстовом режиме).
 
 ## Почему в режиме RNG не ждут текстовые UART-маркеры
 

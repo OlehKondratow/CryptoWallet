@@ -13,8 +13,9 @@
 # - Для HIL: ST-LINK, st-flash/st-info, UART на том же хосте, что и runner
 #
 # Внешние деревья (Makefile): stm32_secure_boot, STM32CubeH7, stm32-ssd1306 — не в этом репо.
-# Checkout в act/cache даёт TOP=.../hostexecutor, поэтому ../stm32_secure_boot не существует.
-# Задайте CRYPTO_DEPS_ROOT (по умолчанию /data/projects) или CI_FIRMWARE_* в env runner/Gitea.
+# Checkout в act/cache даёт TOP=.../hostexecutor, поэтому ../STM32CubeH7 не существует.
+# Обязательно: CRYPTO_DEPS_ROOT=/data/projects (или путь на хосте с этими тремя каталогами).
+# В шаге сборки передаём `make CRYPTO_DEPS_ROOT=...` явно — иначе act/nektos не пробрасывает env в make.
 #
 # Сборка: шаг «Ensure ARM toolchain» проверяет arm-none-eabi-gcc / make и при отсутствии
 # ставит только нужные пакеты (apt). CI_APT_INSTALL_ARM=false — не вызывать apt, только проверка.
@@ -37,7 +38,7 @@ on:
           - '0'
         default: '1'
 
-# Очередь доступа к ST-LINK/UART между workflow (см. cwup-mvp-ci.yml).
+# Очередь доступа к ST-LINK/UART (один runner — не держать два job с платой одновременно).
 concurrency:
   group: cryptowallet-stlink-${{ github.repository }}
   cancel-in-progress: false
@@ -164,17 +165,24 @@ jobs:
         run: |
           set -euo pipefail
           echo "🔨 Building firmware..."
-          export CRYPTO_DEPS_ROOT="${CRYPTO_DEPS_ROOT:-/data/projects}"
-          # Опциональные переопределения (редко нужны)
+          DEPS_ROOT="${CRYPTO_DEPS_ROOT:-/data/projects}"
+          export CRYPTO_DEPS_ROOT="$DEPS_ROOT"
+          # Опциональные переопределения (редко нужны; GNU make подхватит из export)
           [ -n "${CI_FIRMWARE_SECURE_BOOT:-}" ] && export SECURE_BOOT="$CI_FIRMWARE_SECURE_BOOT"
           [ -n "${CI_FIRMWARE_CUBE_ROOT:-}" ] && export CUBE_ROOT="$CI_FIRMWARE_CUBE_ROOT"
           [ -n "${CI_FIRMWARE_SSD1306:-}" ] && export SSD1306="$CI_FIRMWARE_SSD1306"
-          echo "CRYPTO_DEPS_ROOT=$CRYPTO_DEPS_ROOT (Makefile uses this for SECURE_BOOT/CUBE_ROOT/SSD1306)"
-          make clean
+          echo "CRYPTO_DEPS_ROOT=$DEPS_ROOT (Makefile: STM32CubeH7/stm32_secure_boot/stm32-ssd1306)"
+          HAL_PCD="$DEPS_ROOT/STM32CubeH7/Drivers/STM32H7xx_HAL_Driver/Src/stm32h7xx_hal_pcd.c"
+          if [ ! -f "$HAL_PCD" ]; then
+            echo "::error::STM32Cube HAL not found: $HAL_PCD"
+            echo "Set CRYPTO_DEPS_ROOT to the parent of STM32CubeH7 (e.g. /data/projects). act: -e CRYPTO_DEPS_ROOT=/data/projects or bind-mount deps."
+            exit 1
+          fi
+          make CRYPTO_DEPS_ROOT="$DEPS_ROOT" clean
           # CI_BUILD_USE_RNG_DUMP: 1 = бинарный TRNG на UART (дефолт CI); 0 = текстовые маркеры
           RNG="${CI_BUILD_USE_RNG_DUMP:-1}"
           echo "🔧 USE_RNG_DUMP=$RNG USE_WEBUSB=1 (default: WebUSB on; CWUP on UART when RNG=0)"
-          make "USE_RNG_DUMP=$RNG" USE_WEBUSB=1 -j"$(nproc)"
+          make CRYPTO_DEPS_ROOT="$DEPS_ROOT" "USE_RNG_DUMP=$RNG" USE_WEBUSB=1 -j"$(nproc)"
           echo ""
           echo "✅ Build complete:"
           ls -lh build/cryptowallet.bin build/cryptowallet.elf

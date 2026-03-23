@@ -102,7 +102,7 @@ python3 -m pytest tests/mvp -q
 ./scripts/ci_host_mvp.sh
 ```
 
-В **Gitea** отдельные шаги: `FW integrity — host CRC/size`, затем `MVP host tests (pytest)` (см. `.gitea/workflows/simple-ci.yml`, `cwup-mvp-ci.yml`).
+В **Gitea** отдельные шаги: `FW integrity — host CRC/size`, затем `MVP host tests (pytest)` (см. `.gitea/workflows/simple-ci.yml`).
 
 ---
 

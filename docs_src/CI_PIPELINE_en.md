@@ -18,9 +18,7 @@
 - **Disable capture:** `CI_SKIP_RNG_UART_CAPTURE=1` (runner env).
 - **Build is 0 but board has RNG firmware:** `CI_RNG_UART_CAPTURE_FORCE=1`.
 
-### Dedicated workflow: CWUP AT verification
-
-**`.gitea/workflows/cwup-mvp-ci.yml`** runs on push/PR to `main`/`develop`, on **schedule** (daily cron — remove the `schedule` block if unwanted), and **workflow_dispatch**. It builds with **`USE_RNG_DUMP=0`**, runs `pytest tests/mvp`, flashes the artifact, and runs **`scripts/test_cwup_mvp.py`** (CRC + stress). This validates CWUP without changing the default Simple CI RNG build. Concurrency group `cryptowallet-stlink-${{ github.repository }}` is shared with Simple CI to avoid two jobs fighting for the same ST-LINK.
+There is no separate CWUP-only workflow: UART HIL runs in **Simple CI** (manual **Run workflow** with `ci_build_use_rng_dump=0`, or the “Analyse UART Log” job when the build uses text mode).
 
 ## Why text UART markers are not waited in RNG mode
 
