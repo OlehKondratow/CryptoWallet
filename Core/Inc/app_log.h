@@ -1,14 +1,14 @@
 /**
  ******************************************************************************
  * @file    app_log.h
- * @brief   Единый UART-лог: уровни [ERR]/[WARN]/[INFO]/[DBG] и тег подсистемы.
+ * @brief   Unified UART log: levels [ERR]/[WARN]/[INFO]/[DBG] and subsystem tag.
  ******************************************************************************
  * @details
- *          Строковые литералы: @c APP_LOG_ERR("...") , @c APP_LOG_INFO("[NET] ...") .
- *          Динамические строки: @c App_Log_InfoMsg(buf) — добавляет префикс уровня.
- *          @c APP_LOG_DBG отключён, если @c APP_LOG_ENABLE_DBG=0 (по умолчанию).
+ *          String literals: @c APP_LOG_ERR("...") , @c APP_LOG_INFO("[NET] ...") .
+ *          Dynamic strings: @c App_Log_InfoMsg(buf) — prepends the level prefix.
+ *          @c APP_LOG_DBG is disabled when @c APP_LOG_ENABLE_DBG=0 (default).
  *
- *          См. также @c Task_Display_Log() — низкоуровневый вывод без префикса уровня.
+ *          See also @c Task_Display_Log() — low-level output without a level prefix.
  ******************************************************************************
  */
 
@@ -21,7 +21,7 @@
 #define APP_LOG_ENABLE_DBG 0
 #endif
 
-/** Литералы: префикс уровня склеивается со строкой в compile-time */
+/** Literals: level prefix concatenated with the string at compile time */
 #define APP_LOG_ERR(lit) Task_Display_Log("[ERR] " lit)
 #define APP_LOG_WARN(lit) Task_Display_Log("[WARN] " lit)
 #define APP_LOG_INFO(lit) Task_Display_Log("[INFO] " lit)
@@ -31,7 +31,7 @@
 #define APP_LOG_DBG(lit) ((void)0)
 #endif
 
-/** Динамическая строка (полное сообщение без префикса уровня) */
+/** Dynamic string (full message without a level prefix) */
 void App_Log_InfoMsg(const char *msg);
 void App_Log_WarnMsg(const char *msg);
 void App_Log_ErrMsg(const char *msg);
@@ -42,9 +42,9 @@ void App_Log_DbgMsg(const char *msg);
 #endif
 
 /**
- * @brief Сводные строки «кошелёк» для UART и CI (`scripts/ci/uart_boot_markers.txt`).
- * @details MAIN — готовность ядра до @c osKernelStart ; остальные — после старта задач.
- *          Формат: @c [INFO] [WALLET] MAIN ok | @c [INFO] [WALLET] &lt;NAME&gt; info .
+ * @brief Wallet summary lines for UART and CI (`scripts/ci/uart_boot_markers.txt`).
+ * @details MAIN — core ready before @c osKernelStart; the rest after tasks start.
+ *          Format: @c [INFO] [WALLET] MAIN ok | @c [INFO] [WALLET] &lt;NAME&gt; info .
  */
 #define APP_LOG_WALLET_MAIN_OK() APP_LOG_INFO("[WALLET] MAIN ok")
 #define APP_LOG_WALLET_SUB_INFO(name_lit) APP_LOG_INFO("[WALLET] " name_lit " info")

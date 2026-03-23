@@ -1,10 +1,10 @@
 /**
  ******************************************************************************
  * @file    fault_report.h
- * @brief   Cortex-M fault logging (UART без mutex) и инициализация SCB.
+ * @brief   Cortex-M fault logging (UART without mutex) and SCB initialization.
  ******************************************************************************
- * @details Логирование из ISR идёт через HAL_UART_Transmit на huart3 — не
- *          вызывать UART_Log / Task_Display_Log (мьютекс FreeRTOS).
+ * @details Logging from ISR uses HAL_UART_Transmit on huart3 — do not call
+ *          UART_Log / Task_Display_Log (FreeRTOS mutex).
  ******************************************************************************
  */
 
@@ -15,7 +15,7 @@
 
 void Fault_Report_Init(void);
 
-/** Вызывается из configASSERT (FreeRTOS): лог + бесконечный цикл. */
+/** Called from configASSERT (FreeRTOS): log then infinite loop. */
 void Fault_ConfigAssertFailed(const char *file, int line);
 
 #endif /* FAULT_REPORT_H */

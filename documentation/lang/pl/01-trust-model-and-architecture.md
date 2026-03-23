@@ -31,6 +31,20 @@ Wszystko, co wymaga **kryptografii ROM lub bootloadera**, jest **poza zakresem**
 | UART3 CWUP | Brak szyfrowania | Linie AT | Lab/CI; **brak** uwierzytelnienia dla `AT+WALLET?` itd. |
 | UART3 `USE_RNG_DUMP=1` | N/D | Surowe bajty do statystyk | **Wyłącza** CWUP na tym UART |
 
+## 1.3b Uwierzytelnianie i autoryzacja (jawnie)
+
+Terminologia IAM precyzyjnie: to firmware **nie** implementuje warstwowego **uwierzytelniania** transportu (dowodu, który host lub agent wysłał żądanie) ani drobnoziarnistej **autoryzacji** (role, zakresy, silnik polityk).
+
+| Pytanie | Co robi drzewo źródeł |
+|---------|------------------------|
+| **Kto jest klientem HTTP/WebUSB?** | **Nie jest weryfikowany.** Brak TLS client auth, kluczy API, parsowania nagłówka `Authorization` w `task_net.c` i na ścieżce WebUSB. Dowolny host w osiągalnej LAN/USB może wołać endpointy. |
+| **Kto może zainicjować podpis?** | **Nie jest związane z tożsamością.** `POST /tx` kolejkuje żądanie po poprawnym parsowaniu/walidacji; **urządzenie** wymaga potem **fizycznego naciśnięcia** przed podpisem w `task_sign` — to **akceptacja człowieka**, nie kryptograficzny dowód tożsamości klienta HTTP. |
+| **Kto może czytać `/tx/signed`?** | **Każdy**, kto dotrze do urządzenia po HTTP — odpowiedzi nie są powiązane z sesją ani użytkownikiem. |
+| **UART CWUP** | **Brak** uwierzytelniania poleceń (opisane osobno); powierzchnia lab. |
+| **Zaufanie do firmware** | **Inna warstwa:** zweryfikowany bootloader / podpis obrazu w `stm32_secure_boot` dowodzi **integralności kodu**, nie **tożsamości** użytkownika ani peera dla RPC portfela. |
+
+**Zasada operatora:** traktuj ścieżkę sieciową jako **nieuwierzytelnioną**; opieraj się na **umiejscowieniu w sieci** (zaufana LAN), **dostępie fizycznym** do potwierdzenia na urządzeniu i **podglądzie na OLED** — nie na poufności kanału ani tożsamości peera.
+
 ## 1.4 Kształt FreeRTOS
 
 Po `HW_Init()` i `osKernelStart()` typowe zadania to: wyświetlacz, sieć (LwIP + HTTP), podpis, IO (LED/przycisk), wejście użytkownika, opcjonalnie USB, CWUP, zrzut RNG.

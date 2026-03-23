@@ -107,13 +107,13 @@ extern "C" {
 void Error_Handler(void);
 
 /**
- * @brief Как Error_Handler, но с указанием места в коде (файл:строка).
- * @param file Имя файла или NULL для обобщённого сообщения.
- * @param line Номер строки; при @a file == NULL игнорируется.
+ * @brief Like Error_Handler, but reports the faulting source location (file:line).
+ * @param file Source file name, or NULL for a generic message.
+ * @param line Line number; ignored when @a file is NULL.
  */
 void Error_Handler_At(const char *file, int line);
 
-/** Остановка с логом @c Error_Handler_At(__FILE__, __LINE__). */
+/** Halt with logging via @c Error_Handler_At(__FILE__, __LINE__). */
 #define ERROR_HALT() Error_Handler_At(__FILE__, __LINE__)
 
 /**

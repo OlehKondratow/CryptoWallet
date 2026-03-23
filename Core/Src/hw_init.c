@@ -29,7 +29,7 @@ I2C_HandleTypeDef hi2c1;
 RNG_HandleTypeDef hrng;
 #endif
 
-/** Сериализация UART TX (создаётся в @c HW_Init ). */
+/** Serializes UART TX (created in @c HW_Init). */
 static SemaphoreHandle_t s_uart_log_mutex;
 
 static void SystemClock_Config(void);

@@ -78,7 +78,7 @@ def capture(
 
     out_p = Path(out_path).resolve()
     out_p.parent.mkdir(parents=True, exist_ok=True)
-    # Файл появляется сразу (0 байт), чтобы в CI/артефакте был виден результат даже при ошибке
+    # Create the file immediately (0 bytes) so CI/artifacts show output even on failure
     out_p.write_bytes(b"")
     print(f"📁 Output file created (empty): {out_p}", flush=True)
 
@@ -87,7 +87,7 @@ def capture(
     except OSError as e:
         print(f"::error::Cannot open {port}: {e}", flush=True)
         print(
-            "Подсказка: нет устройства, занят другим процессом или нет прав (dialout).",
+            "Hint: no device, port busy by another process, or missing permissions (dialout).",
             flush=True,
         )
         raise SystemExit(1) from e
@@ -103,8 +103,8 @@ def capture(
     t_start = time.monotonic()
     t_last_progress = written  # bytes count at last progress line
     t_last_progress_time = t_start
-    t_last_data_time = t_start  # last time we got UART data (после skip — рост written)
-    saw_uart_rx = False  # любой непустой chunk с порта (учёт --skip)
+    t_last_data_time = t_start  # last time we got UART data (after skip, tracks written)
+    saw_uart_rx = False  # any non-empty chunk from port (--skip aware)
 
     print(
         f"Capturing {total_bytes} bytes from {port} @ {baud} -> {out_p}\n"
@@ -120,8 +120,8 @@ def capture(
             if not saw_uart_rx and now - t_start >= first_byte_timeout:
                 msg = (
                     f"No UART data for {first_byte_timeout:.0f}s — aborting.\n"
-                    "Ожидается бинарный поток RNG (прошивка с USE_RNG_DUMP=1).\n"
-                    "Если CI собран с CI_BUILD_USE_RNG_DUMP=0, на UART идут только текстовые логи."
+                    "Expected binary RNG stream (firmware with USE_RNG_DUMP=1).\n"
+                    "If CI was built with CI_BUILD_USE_RNG_DUMP=0, UART only carries text logs."
                 )
                 print(f"::error::{msg}", flush=True)
                 print(msg, flush=True)
@@ -143,7 +143,7 @@ def capture(
                 # e.g. "device disconnected or multiple access on port" (minicom, another reader)
                 print(
                     f"::warning::UART read error (will retry): {e}\n"
-                    "    Закройте minicom/другие читатели порта; один процесс на tty.",
+                    "    Close minicom/other readers of the port; only one process per tty.",
                     flush=True,
                 )
                 time.sleep(0.25)

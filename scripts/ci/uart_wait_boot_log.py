@@ -1,29 +1,29 @@
 #!/usr/bin/env python3
 """
-Читает UART до появления ожидаемых подстрок (boot / LwIP / задачи / сеть / SNTP).
+Read UART until expected substrings appear (boot / LwIP / tasks / network / SNTP).
 
-По умолчанию порядок строк **не важен**: успех, когда **все** подстроки из файла
-маркеров хотя бы раз встретились в накопленном логе (типичная успешная загрузка).
+By default **line order does not matter**: success when **all** substrings from the
+marker file have appeared at least once in the accumulated log (typical successful boot).
 
-Режим строгого порядка: --ordered или CI_UART_MARKERS_ORDERED=1 .
+Strict order mode: --ordered or CI_UART_MARKERS_ORDERED=1 .
 
-Использование в CI (корень репозитория):
+CI usage (repository root):
   pip install pyserial
   python3 scripts/ci/uart_wait_boot_log.py
 
-Переменные окружения (перекрывают значения по умолчанию):
-  CI_UART_PORT              — устройство (по умолчанию /dev/ttyACM0)
+Environment variables (override defaults):
+  CI_UART_PORT              — device (default /dev/ttyACM0)
   CI_UART_BAUD              — 115200
-  CI_UART_BOOT_TIMEOUT_SEC  — общий таймаут (по умолчанию 120)
-  CI_UART_MARKERS_FILE      — файл маркеров
-  CI_UART_LOG_OUT           — полный лог (uart_output.log)
-  CI_UART_STATUS_OUT        — файл статуса (uart_boot_status.txt)
-  CI_UART_SKIP_NO_DEVICE    — если 1 и порта нет: выход 0 (пропуск)
-  CI_UART_STRICT_NO_DEVICE  — если 1 и порта нет: выход 2
-  CI_UART_MARKERS_ORDERED   — если 1: требовать порядок как в файле (legacy)
-  CI_UART_ST_FLASH_RESET    — если 1 (по умолчанию): после open(serial) вызвать
-                              «st-flash reset», затем ждать маркеры. Иначе сброс
-                              до open — ранние строки ([WALLET] MAIN ok и т.д.) теряются.
+  CI_UART_BOOT_TIMEOUT_SEC  — overall timeout (default 120)
+  CI_UART_MARKERS_FILE      — marker file
+  CI_UART_LOG_OUT           — full log (uart_output.log)
+  CI_UART_STATUS_OUT        — status file (uart_boot_status.txt)
+  CI_UART_SKIP_NO_DEVICE    — if 1 and no port: exit 0 (skip)
+  CI_UART_STRICT_NO_DEVICE  — if 1 and no port: exit 2
+  CI_UART_MARKERS_ORDERED   — if 1: require file order (legacy)
+  CI_UART_ST_FLASH_RESET    — if 1 (default): after open(serial) run
+                              `st-flash reset`, then wait for markers. Otherwise reset
+                              before open — early lines ([WALLET] MAIN ok, etc.) are lost.
 
 Doc index: README.md
 """
@@ -39,7 +39,7 @@ from pathlib import Path
 
 
 def _print_fail_banner(msg: str) -> None:
-    """Дублируем ошибку обычным текстом: в UI Gitea строка ::error:: часто обрезается."""
+    """Repeat the error as plain text; Gitea UI often truncates ::error:: lines."""
     line = "=" * 60
     print(f"\n{line}", flush=True)
     print("UART BOOT MARKERS — FAILED", flush=True)
@@ -53,8 +53,8 @@ def _rx_stats_line(buf: str) -> str:
     hint = ""
     if nbyte == 0:
         hint = (
-            " (ничего не прочитано: неверный порт/скорость, нет прав dialout; "
-            "USE_RNG_DUMP=1 — бинарный поток без строк [WALLET])"
+            " (nothing read: wrong port/speed, no dialout permission; "
+            "USE_RNG_DUMP=1 is binary stream without [WALLET] text lines)"
         )
     return f"RX: {nbyte} byte(s), ~{nlines} line(s){hint}"
 
@@ -74,14 +74,14 @@ def load_markers(path: Path) -> list[str]:
 
 def _maybe_st_flash_reset_after_serial_open(ser) -> None:
     """
-    Сброс МК после открытия COM: иначе бут-лог (MAIN ok, IO/NET/SIGN/USER до link-up)
-    успевает уйти до того, как хост откроет порт.
+    Reset MCU after opening COM; otherwise boot log (MAIN ok, IO/NET/SIGN/USER before link-up)
+    may finish before the host opens the port.
     """
     if os.environ.get("CI_UART_ST_FLASH_RESET", "1").lower() not in ("1", "true", "yes"):
-        print("⏭️  CI_UART_ST_FLASH_RESET=0 — пропуск st-flash reset после open(serial)", flush=True)
+        print("⏭️  CI_UART_ST_FLASH_RESET=0 — skipping st-flash reset after open(serial)", flush=True)
         return
     print(
-        "🔁 st-flash reset (порт уже открыт — захватываем полный бут с [WALLET] MAIN ok …)",
+        "🔁 st-flash reset (port already open — capture full boot with [WALLET] MAIN ok …)",
         flush=True,
     )
     attempts = (
@@ -103,15 +103,15 @@ def _maybe_st_flash_reset_after_serial_open(ser) -> None:
             last_err = (r.stderr or r.stdout or "").strip() or f"exit {r.returncode}"
         except FileNotFoundError:
             print(
-                "⚠️  st-flash не найден в PATH — установите stlink-tools; "
-                "лог без сброса после open может быть неполным.",
+                "⚠️  st-flash not in PATH — install stlink-tools; "
+                "log without post-open reset may be incomplete.",
                 flush=True,
             )
             return
         except subprocess.TimeoutExpired:
             last_err = "timeout"
             break
-    print(f"⚠️  st-flash reset не удался ({last_err!r}) — продолжаем без сброса", flush=True)
+    print(f"⚠️  st-flash reset failed ({last_err!r}) — continuing without reset", flush=True)
 
 
 def main() -> int:

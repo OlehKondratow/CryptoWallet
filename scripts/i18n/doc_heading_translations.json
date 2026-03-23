@@ -1,0 +1,20 @@
+{
+  "ru": {
+    "# CryptoWallet": "# CryptoWallet",
+    "Core & Security": "Ядро и Безопасность",
+    "Communication Interfaces": "Интерфейсы связи",
+    "User Experience": "Интерфейс и UX",
+    "System & Hardware": "Система и Железо",
+    "Documentation and reference": "Документация и справка",
+    "Quick Start": "Быстрый старт"
+  },
+  "pl": {
+    "# CryptoWallet": "# CryptoWallet",
+    "Core & Security": "Jądro i Bezpieczeństwo",
+    "Communication Interfaces": "Interfejsy komunikacji",
+    "User Experience": "Interfejs użytkownika",
+    "System & Hardware": "System i Sprzęt",
+    "Documentation and reference": "Dokumentacja i odniesienia",
+    "Quick Start": "Szybki start"
+  }
+}

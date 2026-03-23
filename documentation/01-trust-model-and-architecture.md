@@ -31,6 +31,20 @@ Anything that requires **ROM or bootloader cryptography** is **out of scope** fo
 | UART3 CWUP | No encryption | Line-at-a-time AT commands | Lab/CI; **no** auth on `AT+WALLET?` etc. |
 | UART3 `USE_RNG_DUMP=1` | N/A | Raw bytes for statistics | **Disables** CWUP on that UART |
 
+## 1.3b Authentication and authorization (explicit)
+
+Use IAM terms precisely—this firmware **does not** implement transport-level **authentication** (proving which host or user agent sent a request) or fine-grained **authorization** (roles, scopes, policy engine).
+
+| Question | What the tree does |
+|------------|---------------------|
+| **Who is the HTTP/WebUSB client?** | **Not verified.** No TLS client auth, no API keys, no `Authorization` header checks in `task_net.c` or the WebUSB path. Any host on the reachable LAN/USB may call the endpoints. |
+| **Who may trigger signing?** | **Not bound to identity.** `POST /tx` enqueues a request if parsing/validation pass; the **device** then requires **physical button** confirmation before `task_sign` signs—this is **human approval**, not cryptographic proof of the HTTP client’s identity. |
+| **Who may read `/tx/signed`?** | **Anyone** who can reach the device over HTTP—responses are not session-scoped or user-bound. |
+| **UART CWUP** | **No** command authentication (documented elsewhere); lab/CI surface. |
+| **Firmware trust** | **Different layer:** verified bootloader / image signing in `stm32_secure_boot` proves **code integrity**, not **user** or **peer** identity for wallet RPC. |
+
+**Operator rule:** treat the network path as **unauthenticated**; rely on **network placement** (trusted LAN), **physical access** to approve on the device, and **OLED review**—not on wire secrecy or peer identity.
+
 ## 1.4 FreeRTOS shape
 
 After `HW_Init()` and `osKernelStart()`, typical tasks include: display, net (LwIP + HTTP), sign, IO (LED/button), user input, optional USB device, optional CWUP task, optional RNG dump task.

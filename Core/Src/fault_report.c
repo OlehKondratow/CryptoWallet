@@ -1,7 +1,7 @@
 /**
  ******************************************************************************
  * @file    fault_report.c
- * @brief   Обработчики NMI / Hard / Mem / Bus / Usage: дамп регистров и SCB.
+ * @brief   NMI / Hard / Mem / Bus / Usage fault handlers: dump registers and SCB.
  ******************************************************************************
  */
 
@@ -45,10 +45,10 @@ void Fault_ConfigAssertFailed(const char *file, int line)
 
 void Fault_Report_Init(void)
 {
-    /* Включить отдельные fault handler’ы (иначе эскалация в HardFault). */
+    /* Enable fault handlers (otherwise faults escalate to HardFault). */
     SCB->SHCSR |= (uint32_t)(SCB_SHCSR_MEMFAULTENA_Msk | SCB_SHCSR_BUSFAULTENA_Msk |
                              SCB_SHCSR_USGFAULTENA_Msk);
-    /* Ловить деление на ноль (если компилятор генерирует SDIV/UDIV). */
+    /* Catch divide-by-zero (when the compiler emits SDIV/UDIV). */
     SCB->CCR |= (uint32_t)SCB_CCR_DIV_0_TRP_Msk;
 }
 
