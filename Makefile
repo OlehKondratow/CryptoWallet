@@ -238,7 +238,8 @@ ifeq ($(USE_RNG_DUMP),1)
 OBJ_MINIMAL_LWIP += $(BUILD)/rng_dump.o $(BUILD)/hal_rng.o
 endif
 
-USB_CUBE   := $(abspath $(TOP)/../STM32CubeH7)
+# Same tree as CUBE_ROOT (CRYPTO_DEPS_ROOT); do not use $(TOP)/../STM32CubeH7 — breaks act cache checkouts.
+USB_CUBE   := $(CUBE_ROOT)
 USB_MW     := $(USB_CUBE)/Middlewares/ST/STM32_USB_Device_Library
 WEBUSB_OBJ := $(BUILD)/usbd_conf_cw.o $(BUILD)/usbd_desc_cw.o $(BUILD)/usb_device.o \
       $(BUILD)/usb_webusb.o $(BUILD)/stm32h7xx_it_usb.o
