@@ -71,6 +71,7 @@ def capture(
 ) -> int:
     try:
         import serial
+        from serial.serialutil import SerialException
     except ImportError:
         print("Install pyserial: pip install -r scripts/requirements.txt", file=sys.stderr)
         sys.exit(1)
@@ -136,7 +137,17 @@ def capture(
                 f.flush()
                 raise SystemExit(3)
 
-            chunk = ser.read(min(4096, total_bytes - written + skip_left))
+            try:
+                chunk = ser.read(min(4096, total_bytes - written + skip_left))
+            except SerialException as e:
+                # e.g. "device disconnected or multiple access on port" (minicom, another reader)
+                print(
+                    f"::warning::UART read error (will retry): {e}\n"
+                    "    Закройте minicom/другие читатели порта; один процесс на tty.",
+                    flush=True,
+                )
+                time.sleep(0.25)
+                continue
             if not chunk:
                 continue
 

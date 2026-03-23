@@ -16,7 +16,9 @@
 
 - **Переключить на текстовые логи:** только **Run workflow** → `ci_build_use_rng_dump` = **0** (отладка маркеров; RNG capture тогда не ждёт бинарный поток).
 - **Отключить захват:** `CI_SKIP_RNG_UART_CAPTURE=1` (env runner).
+- **Строгий RNG-шаг:** `CI_RNG_UART_CAPTURE_STRICT=1` — при неудачном `capture_rng_uart.py` job падает (плата + UART без minicom). По умолчанию `0`: шаг зелёный, артефакт может быть пустым (удобно для act/локально).
 - **Сборка 0, на плате RNG-прошивка:** `CI_RNG_UART_CAPTURE_FORCE=1`.
+- **DIEHARDER smoke:** в job `hardware-test` по умолчанию один быстрый тест (`dieharder -d 0`, birthdays) на файле захвата (`CI_RNG_CAPTURE_BYTES`, сейчас **20 MiB**). Утилита почти всегда завершается с **кодом 0**, даже если в таблице **FAILED** — это статистика одного теста, не «exit failure». Сообщение *file was rewound N times* значит, что для выбранного теста не хватило длины файла и выборки **не независимы** как у бесконечного потока; пограничные p-value на коротком файле ожидаемы. Для приёмки TRNG — ещё больший `rng_test.bin` (сотни MiB) и `CI_RNG_DIEHARDER_FULL=1` (долго).
 
 ## MVP-тесты в pipeline
 

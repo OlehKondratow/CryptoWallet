@@ -20,7 +20,7 @@ BYTES="${RNG_CAPTURE_BYTES:-134217728}"
 QUICK="${QUICK:-0}"
 
 if [[ "$QUICK" == "1" ]]; then
-  BYTES="${RNG_CAPTURE_BYTES:-1000000}"
+  BYTES="${RNG_CAPTURE_BYTES:-20000000}"
 fi
 
 echo "═══════════════════════════════════════════════════════════════════"

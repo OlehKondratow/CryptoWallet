@@ -16,7 +16,9 @@
 
 - **Text logs for debugging:** **Run workflow** → set `ci_build_use_rng_dump` to **0** (markers run; RNG capture expects no binary stream).
 - **Disable capture:** `CI_SKIP_RNG_UART_CAPTURE=1` (runner env).
+- **Strict RNG step:** `CI_RNG_UART_CAPTURE_STRICT=1` — fail the job if UART capture fails (board + exclusive UART). Default `0`: step succeeds; artifact may be empty (local/act-friendly).
 - **Build is 0 but board has RNG firmware:** `CI_RNG_UART_CAPTURE_FORCE=1`.
+- **DIEHARDER smoke:** the `hardware-test` job runs a single quick test (`dieharder -d 0`, birthdays) on the captured file (`CI_RNG_CAPTURE_BYTES`, default **20 MiB**). **Exit code is usually 0** even when the table shows **FAILED** — that column is one test’s statistics, not a process failure. *File was rewound N times* means the test needed more bits than the file provides, so samples are **not** like an i.i.d. infinite stream; borderline p-values on a short file are expected. For a serious TRNG check, use a much larger capture and `CI_RNG_DIEHARDER_FULL=1` (slow).
 
 There is no separate CWUP-only workflow: UART HIL runs in **Simple CI** (manual **Run workflow** with `ci_build_use_rng_dump=0`, or the “Analyse UART Log” job when the build uses text mode).
 
