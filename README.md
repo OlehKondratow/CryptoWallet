@@ -1,5 +1,7 @@
 # 🔐 CryptoWallet - Secure Bitcoin Microcontroller Wallet
 
+![Project photo](images/photo_2026-03-23_14-41-33.jpg)
+
 **A production-grade hardware wallet demonstrating modern embedded systems architecture**
 
 Secure Bitcoin transaction signing on **STM32H743** with advanced memory management, real-time task scheduling, multi-protocol communication, and cryptographic signing. **UART** carries **CWUP-0.1** (MVP line protocol on USART3) for diagnostics, boot-chain queries, and CI/HIL—see below and [`documentation/05-uart-cwup-protocol.md`](documentation/05-uart-cwup-protocol.md).

@@ -1,5 +1,7 @@
 # CryptoWallet — documentation translations
 
+![Project photo](../../images/photo_2026-03-23_14-41-33.jpg)
+
 Human translations of the technical canon. **English** files in the parent [`documentation/`](../README.md) directory remain authoritative for identifiers (function names, build flags, paths).
 
 | Language | Folder | Notes |

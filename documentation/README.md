@@ -1,5 +1,7 @@
 # CryptoWallet — documentation
 
+![Project photo](../images/photo_2026-03-23_14-41-33.jpg)
+
 Single technical canon (English). The firmware is treated as **one system**: trust boundaries, surfaces, crypto, verification, and operations are described at the same depth.
 
 **Translations:** Russian and Polish copies live under [`lang/`](lang/README.md) (`lang/ru/`, `lang/pl/`). Canonical technical identifiers (paths, flags, code symbols) stay as in English.

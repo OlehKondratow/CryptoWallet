@@ -1,5 +1,7 @@
 # Scripts (host)
 
+![Project photo](../images/photo_2026-03-23_14-41-33.jpg)
+
 **Manual:** [`documentation/README.md`](../documentation/README.md) — security model, CI, UART, integrity.
 
 ## CI / regression

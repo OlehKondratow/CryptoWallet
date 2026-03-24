@@ -1,5 +1,7 @@
 # CryptoWallet — dokumentacja
 
+![Project photo](../../../images/photo_2026-03-23_14-41-33.jpg)
+
 Jednolity kanon techniczny (oryginał angielski: [`../../README.md`](../../README.md)). Oprogramowanie układowe jest traktowane jako **jeden system**: granice zaufania, powierzchnie ataku, kryptografia, weryfikacja i eksploatacja — ten sam poziom szczegółów.
 
 **Tłumaczenie:** ten katalog zawiera wersję polską; identyfikatory (nazwy funkcji, flagi kompilacji, ścieżki plików) pozostają jak w angielskim tekście.
