@@ -6,7 +6,7 @@
 
 Secure Bitcoin transaction signing on **STM32H743** with advanced memory management, real-time task scheduling, multi-protocol communication, and cryptographic signing. **UART** carries **CWUP-0.1** (MVP line protocol on USART3) for diagnostics, boot-chain queries, and CI/HIL—see below and [`documentation/05-uart-cwup-protocol.md`](documentation/05-uart-cwup-protocol.md).
 
-**Languages:** 🇬🇧 [English](README.md) | 🇷🇺 [Русский](README_ru.md) | 🇵🇱 [Polski](README_pl.md)
+**Translations:** see [`documentation/lang/`](documentation/lang/README.md) (Russian, Polish)
 
 **Canonical manual (English, uniform depth):** [`documentation/README.md`](documentation/README.md) — chapters 1–7 (trust model through build/CI). This file is the long-form overview; generated excerpts are under [`documentation/generated/`](documentation/generated/).
 
@@ -1023,8 +1023,7 @@ Narrative depth is in **`documentation/*.md`** (see the **Related Documentation*
 
 **Choose your language:**
 - 🇬🇧 English (above)
-- 🇷🇺 [Русский](README_ru.md)
-- 🇵🇱 [Polski](README_pl.md)
+- Documentation translations: [`documentation/lang/`](documentation/lang/README.md)
 
 ---
 

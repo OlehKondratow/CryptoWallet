@@ -1,6 +1,6 @@
 # Test plan: Bitcoin signing & RNG
 
-_Generated: 2026-03-23 01:19 UTC_
+_Generated: 2026-03-24 12:12 UTC_
 
 This plan complements project documentation. Automated hooks are minimal;
 mark items manually in your tracker or checklist.

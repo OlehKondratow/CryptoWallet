@@ -8,14 +8,14 @@
     # or: python3 scripts/generate_code_reference_md.py
     ```
 
-**Generated:** 2026-03-23 01:29 UTC  
+**Generated:** 2026-03-24 12:12 UTC  
 **Source:** file headers (`@file` / `@brief` / `@details` in `/** ... */`) and Python module docstrings in `scripts/*.py`.  
 **Design:** [code-doc-generation](code-doc-generation.md)
 
 ## Firmware — Core/Src
 
 ### `Core/Src/app_log.c`
-**@brief:** Реализация @c App_Log_*Msg — префикс уровня + обрезка под @c UART_Log .
+**@brief:** Implements @c App_Log_*Msg — level prefix + truncation for @c UART_Log .
 
 ### `Core/Src/crypto_wallet.c`
 **@brief:** trezor-crypto glue: STM32 TRNG, @c random_buffer , BIP-32, ECDSA sign.
@@ -45,7 +45,7 @@ Phases (do not mix with @c USE_RNG_DUMP raw binary build):
 **@brief:** Probe get_wallet_seed() with a temp buffer — lab/CI only; clears buffer immediately.
 
 ### `Core/Src/fault_report.c`
-**@brief:** Обработчики NMI / Hard / Mem / Bus / Usage: дамп регистров и SCB.
+**@brief:** NMI / Hard / Mem / Bus / Usage fault handlers: dump registers and SCB.
 
 ### `Core/Src/fw_integrity.c`
 **@brief:** CRC32 (IEEE / Ethernet polynomial) over contiguous Flash image [__app_flash_start, __app_flash_end).
@@ -119,12 +119,12 @@ trezor-crypto sha2.c instead. **Headers:** sha256_minimal.h .
 **@brief:** Interrupt handlers - FreeRTOS SysTick, ETH (when USE_LWIP).
 
 ### `Core/Src/stm32h7xx_it_lwip.c`
-**@brief:** Ethernet IRQ для minimal-lwip (fault’ы — в fault_report.c).
+**@brief:** Ethernet IRQ for minimal-lwip (fault handlers live in fault_report.c).
 
 **@details**
 
-Раньше использовался $(LWIP_APP)/Src/stm32h7xx_it.c с пустыми fault
-loop; теперь сборка берёт этот файл из репозитория CryptoWallet.
+Previously $(LWIP_APP)/Src/stm32h7xx_it.c was used with empty fault
+loops; the build now takes this file from the CryptoWallet repository.
 
 ### `Core/Src/stm32h7xx_it_systick.c`
 **@brief:** SysTick handler for minimal-lwip (FreeRTOS tick).
@@ -271,14 +271,14 @@ Production: replace with secure element / flash encryption workflow.
 Implemented in app_ethernet_cw.c. Used by ethernetif and task_net.
 
 ### `Core/Inc/app_log.h`
-**@brief:** Единый UART-лог: уровни [ERR]/[WARN]/[INFO]/[DBG] и тег подсистемы.
+**@brief:** Unified UART log: levels [ERR]/[WARN]/[INFO]/[DBG] and subsystem tag.
 
 **@details**
 
-Строковые литералы: @c APP_LOG_ERR("...") , @c APP_LOG_INFO("[NET] ...") .
-Динамические строки: @c App_Log_InfoMsg(buf) — добавляет префикс уровня.
-@c APP_LOG_DBG отключён, если @c APP_LOG_ENABLE_DBG=0 (по умолчанию).
-См. также @c Task_Display_Log() — низкоуровневый вывод без префикса уровня.
+String literals: @c APP_LOG_ERR("...") , @c APP_LOG_INFO("[NET] ...") .
+Dynamic strings: @c App_Log_InfoMsg(buf) — prepends the level prefix.
+@c APP_LOG_DBG is disabled when @c APP_LOG_ENABLE_DBG=0 (default).
+See also @c Task_Display_Log() — low-level output without a level prefix.
 
 ### `Core/Inc/crypto_wallet.h`
 **@brief:** trezor-crypto integration: RNG, BIP-39, BIP-32, ECDSA secp256k1.
@@ -295,12 +295,12 @@ Target: STM32H743 (TRNG + timer entropy). ARM GCC compatible.
 **@brief:** CWUP / lab: non-secret snapshot of wallet seed availability (no authentication).
 
 ### `Core/Inc/fault_report.h`
-**@brief:** Cortex-M fault logging (UART без mutex) и инициализация SCB.
+**@brief:** Cortex-M fault logging (UART without mutex) and SCB initialization.
 
 **@details**
 
-Логирование из ISR идёт через HAL_UART_Transmit на huart3 — не
-вызывать UART_Log / Task_Display_Log (мьютекс FreeRTOS).
+Logging from ISR uses HAL_UART_Transmit on huart3 — do not call
+UART_Log / Task_Display_Log (FreeRTOS mutex).
 
 ### `Core/Inc/fw_integrity.h`
 **@brief:** Runtime CRC32 over the programmed application region in internal Flash.
@@ -596,16 +596,17 @@ See documentation/MAINTENANCE.md for tooling.
 ```
 ### `scripts/generate_readme_languages.py`
 ```text
-Generate README in multiple languages (EN, RU, PL) from base English README.
-Translates section headers and descriptive text while preserving links and code.
+Generate canonical English README from base README source.
+Legacy RU/PL generation has been removed in favor of documentation/lang/* translations.
+
+Non-English replacement strings live in UTF-8 JSON (see scripts/i18n/readme_translations.json)
+so this file stays ASCII-only.
 
 Usage:
     python3 scripts/generate_readme_languages.py
-    
+
 Output:
-    - README.md (English - unchanged)
-    - README_ru.md (Russian)
-    - README_pl.md (Polish)
+    - README.md (English - canonical)
 ```
 ### `scripts/mvp_cwup.py`
 ```text
@@ -709,6 +710,9 @@ Usage:
 ```text
 Create multi-language documentation copies: EN, RU, PL.
 Uses simple pattern-based translation + Google Translate API fallback.
+
+Example heading maps (RU/PL strings) live in scripts/i18n/doc_heading_translations.json
+so this file stays ASCII-only.
 ```
 ### `scripts/update_readme.py`
 ```text
