@@ -1,14 +1,14 @@
 # Full Paths Reference - Host Runner & CI
 
-## Act runner: root vs обычный пользователь
+## Act runner: root vs regular user
 
-- Если **act_runner запущен от root** (в т.ч. «из каталога проекта»): домашний каталог
-  — `/root/`, конфиг может лежать рядом с бинарником или в `/root/gitea-runner/`;
-  джобы с меткой `cryptowallet-host:host` (см. `simple-ci.yml`) выполняются **от root** на хосте.
-- Если runner от **обычного пользователя** (пример ниже с `pilgrim`): пути вида
-  `/home/pilgrim/gitea-runner/`, для Podman — `DOCKER_HOST=unix:///run/user/UID/...`.
+- If **act_runner runs as root** (including launch from project directory): home directory
+  is `/root/`, config may be next to the binary or in `/root/gitea-runner/`;
+  jobs with label `cryptowallet-host:host` (see `simple-ci.yml`) run **as root** on host.
+- If runner runs as a **regular user** (example below uses `pilgrim`): paths are like
+  `/home/pilgrim/gitea-runner/`, and for Podman use `DOCKER_HOST=unix:///run/user/UID/...`.
 
-Ниже — пример для пользовательского runner; замените `/home/pilgrim` на вашу схему.
+Below is an example for a user-level runner; replace `/home/pilgrim` with your layout.
 
 ## 🏠 Local Machine Paths
 

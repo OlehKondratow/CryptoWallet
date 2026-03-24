@@ -66,6 +66,7 @@ Thumbs.db
 # Temporary / local
 config-copied
 *.bak
+scripts/temp/*
 
 # Testing / RNG outputs
 rng.bin

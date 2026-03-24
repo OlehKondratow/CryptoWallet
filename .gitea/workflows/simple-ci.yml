@@ -1,27 +1,29 @@
 # Simple CI — self-hosted Gitea (act_runner).
 #
-# НЕ используйте `container: false` в job: в act_runner v0.3.x это даёт образ
-# `docker.io/library/false` (булево читается как имя образа). Вместо этого
-# зарегистрируйте runner ТОЛЬКО с меткой (см. infra/reregister-act-runner.sh):
+# Do NOT use `container: false` in a job: with act_runner v0.3.x this resolves to
+# `docker.io/library/false` (boolean parsed as an image name). Instead,
+# register the runner with LABELS ONLY (see infra/reregister-act-runner.sh):
 #   cryptowallet-host:host
-# В workflow используется runs-on: cryptowallet-host — уникальная метка, чтобы Gitea
-# НЕ назначала job на чужой docker-runner с ubuntu-latest:docker (checkout тогда ломается).
+# This workflow uses runs-on: cryptowallet-host as a unique label so Gitea
+# does NOT schedule jobs on unrelated docker runners (checkout may fail there).
 #
 # Requirements:
-# - Runner: метка cryptowallet-host:host (без docker:// для этого репозитория).
-#   Перерегистрация: GITEA_RUNNER_LABELS=cryptowallet-host:host ./infra/reregister-act-runner.sh
-# - Для HIL: ST-LINK, st-flash/st-info, UART на том же хосте, что и runner
+# - Runner label: cryptowallet-host:host (no docker:// for this repository).
+#   Re-register: GITEA_RUNNER_LABELS=cryptowallet-host:host ./infra/reregister-act-runner.sh
+# - For HIL: ST-LINK, st-flash/st-info, and UART on the same host as the runner
 #
-# Внешние деревья (Makefile): stm32_secure_boot, STM32CubeH7, stm32-ssd1306 — не в этом репо.
-# Checkout в act/cache даёт TOP=.../hostexecutor, поэтому ../STM32CubeH7 не существует.
-# Обязательно: CRYPTO_DEPS_ROOT=/data/projects (или путь на хосте с этими тремя каталогами).
-# В шаге сборки передаём `make CRYPTO_DEPS_ROOT=...` явно — иначе act/nektos не пробрасывает env в make.
+# External trees required by Makefile: stm32_secure_boot, STM32CubeH7, stm32-ssd1306
+# are outside this repository.
+# Checkout in act/cache sets TOP=.../hostexecutor, so ../STM32CubeH7 does not exist.
+# Required: CRYPTO_DEPS_ROOT=/data/projects (or a host path containing those three dirs).
+# In the build step we pass `make CRYPTO_DEPS_ROOT=...` explicitly; otherwise act/nektos
+# may not forward env vars into make.
 #
-# Сборка: шаг «Ensure ARM toolchain» проверяет arm-none-eabi-gcc / make и при отсутствии
-# ставит только нужные пакеты (apt). CI_APT_INSTALL_ARM=false — не вызывать apt, только проверка.
-# Python: см. CI_INSTALL_HOST_DEPS ниже и шаги pip/venv.
+# Build: the "Ensure ARM toolchain" step checks arm-none-eabi-gcc / make and installs
+# only missing packages via apt. CI_APT_INSTALL_ARM=false means "check only, do not apt install".
+# Python: see CI_INSTALL_HOST_DEPS below and the pip/venv steps.
 
-# Имя без «→»: часть раннеров/act некорректно парсит workflow при спецсимволах в name.
+# Keep name ASCII-only: some runners/act parse special symbols in workflow names incorrectly.
 name: Simple CI - Build Flash Test
 
 on:
@@ -31,60 +33,62 @@ on:
   workflow_dispatch:
     inputs:
       ci_build_use_rng_dump:
-        description: '1 = USE_RNG_DUMP (бинарный TRNG на UART, как в push/PR). 0 = текстовые [WALLET]-маркеры, без ожидания RNG-capture.'
+        description: '1 = USE_RNG_DUMP (binary TRNG on UART, like push/PR). 0 = text [WALLET] markers without waiting for RNG capture.'
         type: choice
         options:
           - '1'
           - '0'
         default: '1'
 
-# Очередь доступа к ST-LINK/UART (один runner — не держать два job с платой одновременно).
+# ST-LINK/UART access queue (single runner; do not run two board jobs at once).
 concurrency:
   group: cryptowallet-stlink-${{ github.repository }}
   cancel-in-progress: false
 
 env:
-  # Python: false = только проверка импортов; true = pip/venv как в шагах ниже
+  # Python: false = import checks only; true = pip/venv as in steps below
   CI_INSTALL_HOST_DEPS: 'false'
-  # ARM: true (по умолчанию) = если нет gcc/make — apt install только недостающих пакетов
+  # ARM: true (default) = if gcc/make is missing, apt-install only missing packages
   CI_APT_INSTALL_ARM: 'true'
-  # Makefile: пути к stm32_secure_boot / STM32CubeH7 / stm32-ssd1306 (обязательно для host checkout в act cache)
+  # Makefile: paths to stm32_secure_boot / STM32CubeH7 / stm32-ssd1306 (required for host checkout in act cache)
   CRYPTO_DEPS_ROOT: '/data/projects'
-  # HIL UART: st-flash reset выполняется ВНУТРИ uart_wait_boot_log.py ПОСЛЕ open(COM),
-  # иначе теряются ранние строки [WALLET] MAIN ok / IO / NET / …
+  # HIL UART: st-flash reset is done INSIDE uart_wait_boot_log.py AFTER open(COM),
+  # otherwise early lines like [WALLET] MAIN ok / IO / NET / ... can be missed
   CI_UART_BOOT_TIMEOUT_SEC: '120'
   CI_UART_ST_FLASH_RESET: '1'
-  # По умолчанию USE_RNG_DUMP=1 (TRNG на UART для CI). Ручной запуск: inputs.ci_build_use_rng_dump (0 = текстовые маркеры).
+  # Default USE_RNG_DUMP=1 (TRNG over UART for CI). Manual run: inputs.ci_build_use_rng_dump (0 = text markers).
   CI_BUILD_USE_RNG_DUMP: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.ci_build_use_rng_dump || '1' }}
-  # scripts/capture_rng_uart.py: таймауты и прогресс (см. --help / CI_RNG_* в скрипте)
+  # scripts/capture_rng_uart.py: timeouts and progress (see --help / CI_RNG_* in script)
   CI_RNG_FIRST_BYTE_TIMEOUT_SEC: '90'
   CI_RNG_STALL_TIMEOUT_SEC: '180'
   CI_RNG_PROGRESS_INTERVAL_SEC: '5'
-  # 20 MiB (20× бывший дефолт 1 MiB); при ~7.4 KiB/s захват ~45–50 min — см. timeout job hardware-test
+  # 20 MiB (20x former default of 1 MiB); at ~7.4 KiB/s capture takes ~45-50 min
+  # see hardware-test job timeout.
   CI_RNG_CAPTURE_BYTES: '20000000'
-  # Минимальный размер rng_test.bin для dieharder (иначе утилита подставляет свой PRNG — не МК)
+  # Minimum rng_test.bin size for dieharder (otherwise it may fall back to its own PRNG, not MCU data)
   CI_RNG_DIEHARDER_MIN_BYTES: '262144'
-  # 0 = один быстрый тест (-d 0); 1 = полный dieharder -a (очень долго, лог в dieharder_full.log)
+  # 0 = one quick test (-d 0); 1 = full dieharder -a (very long, log in dieharder_full.log)
   CI_RNG_DIEHARDER_FULL: '0'
-  # Пропустить долгий RNG-шаг (например прошивка без USE_RNG_DUMP=1): CI_SKIP_RNG_UART_CAPTURE=1
+  # Skip long RNG step (for example firmware without USE_RNG_DUMP=1): CI_SKIP_RNG_UART_CAPTURE=1
   CI_SKIP_RNG_UART_CAPTURE: '0'
-  # Если CI_BUILD_USE_RNG_DUMP=0, шаг захвата RNG автоматически пропускается (exit 0), иначе 90s таймаут и «failure».
-  # Принудительно запустить захват при несовпадении сборки (например вручную прошили RNG-сборку): CI_RNG_UART_CAPTURE_FORCE=1
+  # If CI_BUILD_USE_RNG_DUMP=0, RNG capture is skipped automatically (exit 0); otherwise timeout is 90s and may fail.
+  # Force capture even when build mode differs (e.g. manually flashed RNG build): CI_RNG_UART_CAPTURE_FORCE=1
   CI_RNG_UART_CAPTURE_FORCE: '0'
-  # 0 = при неудачном capture шаг RNG всё равно exit 0 (pipeline зелёный; артефакт может быть пустым). act/minicom на порту.
-  # 1 = передать код выхода capture_rng_uart.py (строгий HIL на runner с платой и эксклюзивным UART).
+  # 0 = on capture failure, RNG step still exits 0 (pipeline stays green; artifact may be empty), useful with act/minicom on UART.
+  # 1 = propagate capture_rng_uart.py exit code (strict HIL on a board runner with exclusive UART).
   CI_RNG_UART_CAPTURE_STRICT: '0'
-  # MVP: pytest tests/mvp в job build (хост, pytest+ecdsa)
-  # CWUP HIL: scripts/test_cwup_mvp.py в analyse-log при CI_BUILD_USE_RNG_DUMP=0 (иначе CWUP в прошивке нет)
+  # MVP: pytest tests/mvp in build job (host, pytest+ecdsa)
+  # CWUP HIL: scripts/test_cwup_mvp.py in analyse-log when CI_BUILD_USE_RNG_DUMP=0
+  # (otherwise CWUP is not available in firmware)
   CI_CWUP_STRESS_ROUNDS: '5'
   CI_CWUP_READY_TIMEOUT_SEC: '45'
-  # 1 = нет порта → exit 0 (как CI_UART_SKIP_NO_DEVICE); 0 = строгий HIL при наличии /dev/ttyACM0
+  # 1 = no port -> exit 0 (like CI_UART_SKIP_NO_DEVICE); 0 = strict HIL requiring /dev/ttyACM0
   CI_CWUP_SKIP_NO_DEVICE: '1'
-  # Ожидаемые флаги AT+WALLET? (сборка Simple CI без USE_TEST_SEED → 0,0)
+  # Expected AT+WALLET? flags (Simple CI build without USE_TEST_SEED -> 0,0)
   CI_CWUP_EXPECT_WALLET_SEED: '0'
   CI_CWUP_EXPECT_CRYPTO_SIGN: '0'
 
-# Явно bash для всех шагов `run:` (как в интерактивной shell).
+# Use bash explicitly for all `run:` steps (same as interactive shell).
 defaults:
   run:
     shell: bash
@@ -97,7 +101,7 @@ jobs:
     name: '1️⃣ Build Firmware'
     runs-on: cryptowallet-host
     env:
-      # Дублируем на уровне job: на некоторых версиях Gitea глобальный env не попадает в make
+      # Duplicate at job level: some Gitea versions do not pass global env to make
       CRYPTO_DEPS_ROOT: '/data/projects'
     steps:
       - name: Checkout code
@@ -109,29 +113,29 @@ jobs:
         run: |
           set -euo pipefail
           export DEBIAN_FRONTEND=noninteractive
-          echo "=== Текущее состояние ==="
-          command -v arm-none-eabi-gcc >/dev/null && arm-none-eabi-gcc --version | head -1 || echo "  arm-none-eabi-gcc: нет"
-          command -v arm-none-eabi-objcopy >/dev/null && echo "  arm-none-eabi-objcopy: ok" || echo "  arm-none-eabi-objcopy: нет"
-          command -v make >/dev/null && make --version | head -1 || echo "  make: нет"
+          echo "=== Current state ==="
+          command -v arm-none-eabi-gcc >/dev/null && arm-none-eabi-gcc --version | head -1 || echo "  arm-none-eabi-gcc: missing"
+          command -v arm-none-eabi-objcopy >/dev/null && echo "  arm-none-eabi-objcopy: ok" || echo "  arm-none-eabi-objcopy: missing"
+          command -v make >/dev/null && make --version | head -1 || echo "  make: missing"
 
           need=()
           command -v arm-none-eabi-gcc >/dev/null || need+=(gcc-arm-none-eabi binutils-arm-none-eabi)
           command -v make >/dev/null || need+=(make)
 
           if [ "${#need[@]}" -eq 0 ]; then
-            echo "✓ Тулчейн и make уже установлены, apt не нужен."
+            echo "✓ Toolchain and make are already installed; apt is not needed."
             exit 0
           fi
 
-          echo "=== Не хватает пакетов: ${need[*]} ==="
+          echo "=== Missing packages: ${need[*]} ==="
 
           if [ "${CI_APT_INSTALL_ARM:-true}" != "true" ]; then
-            echo "Установите вручную: sudo apt install -y ${need[*]}"
-            echo "Или выставьте CI_APT_INSTALL_ARM=true в workflow."
+            echo "Install manually: sudo apt install -y ${need[*]}"
+            echo "Or set CI_APT_INSTALL_ARM=true in this workflow."
             exit 1
           fi
 
-          echo "=== apt install (только недостающее) ==="
+          echo "=== apt install (missing packages only) ==="
           if [ "$(id -u)" -eq 0 ]; then
             apt-get update -qq
             apt-get install -y --no-install-recommends "${need[@]}"
@@ -142,7 +146,7 @@ jobs:
 
           command -v arm-none-eabi-gcc >/dev/null
           command -v make >/dev/null
-          echo "✓ После установки:"
+          echo "✓ After installation:"
           arm-none-eabi-gcc --version | head -1
           make --version | head -1
 
@@ -171,7 +175,7 @@ jobs:
           echo "🔨 Building firmware..."
           DEPS_ROOT="${CRYPTO_DEPS_ROOT:-/data/projects}"
           export CRYPTO_DEPS_ROOT="$DEPS_ROOT"
-          # Опциональные переопределения (редко нужны; GNU make подхватит из export)
+          # Optional overrides (rarely needed; GNU make picks them up from export)
           [ -n "${CI_FIRMWARE_SECURE_BOOT:-}" ] && export SECURE_BOOT="$CI_FIRMWARE_SECURE_BOOT"
           [ -n "${CI_FIRMWARE_CUBE_ROOT:-}" ] && export CUBE_ROOT="$CI_FIRMWARE_CUBE_ROOT"
           [ -n "${CI_FIRMWARE_SSD1306:-}" ] && export SSD1306="$CI_FIRMWARE_SSD1306"
@@ -183,7 +187,7 @@ jobs:
             exit 1
           fi
           make CRYPTO_DEPS_ROOT="$DEPS_ROOT" clean
-          # CI_BUILD_USE_RNG_DUMP: 1 = бинарный TRNG на UART (дефолт CI); 0 = текстовые маркеры
+          # CI_BUILD_USE_RNG_DUMP: 1 = binary TRNG on UART (CI default); 0 = text markers
           RNG="${CI_BUILD_USE_RNG_DUMP:-1}"
           echo "🔧 USE_RNG_DUMP=$RNG USE_WEBUSB=1 (default: WebUSB on; CWUP on UART when RNG=0)"
           make CRYPTO_DEPS_ROOT="$DEPS_ROOT" "USE_RNG_DUMP=$RNG" USE_WEBUSB=1 -j"$(nproc)"
@@ -273,7 +277,7 @@ jobs:
           name: firmware-build
           path: build/
 
-      - name: Setup Python (pyserial — без PEP 668 pip на системный Python)
+      - name: Setup Python (pyserial, avoid PEP 668 system pip issues)
         run: |
           set -euo pipefail
           if python3 -c "import serial" 2>/dev/null; then
@@ -301,7 +305,7 @@ jobs:
           set -euo pipefail
           touch uart_boot_status.txt uart_output.log
           if [ "${CI_BUILD_USE_RNG_DUMP:-1}" = "1" ]; then
-            echo "⏭️  USE_RNG_DUMP=1: UART — бинарный поток TRNG; текстовые маркеры [WALLET] не ожидаются (см. documentation/06-integrity-rng-verification.md)."
+            echo "⏭️  USE_RNG_DUMP=1: UART provides binary TRNG stream; text [WALLET] markers are not expected (see documentation/06-integrity-rng-verification.md)."
             echo "skipped: rng_dump_mode CI_BUILD_USE_RNG_DUMP=1" > uart_boot_status.txt
             echo "(UART binary TRNG stream — no text boot log)" > uart_output.log
             exit 0
@@ -405,7 +409,7 @@ jobs:
   # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   quick-test:
     name: '4️⃣ Quick Preliminary Test'
-    # Список для совместимости с частью парсеров act/Gitea ('runs-on' not defined)
+    # List form for compatibility with some act/Gitea parsers ('runs-on' not defined)
     runs-on: [cryptowallet-host]
     needs: analyse-log
     if: always()
@@ -422,7 +426,7 @@ jobs:
       - name: Verify Python deps on host
         if: ${{ env.CI_INSTALL_HOST_DEPS != 'true' }}
         run: |
-          python3 -c "import serial, requests" || { echo "pip install --user pyserial requests или CI_INSTALL_HOST_DEPS=true"; exit 1; }
+          python3 -c "import serial, requests" || { echo "Run: pip install --user pyserial requests, or set CI_INSTALL_HOST_DEPS=true"; exit 1; }
 
       - name: Device connectivity check
         run: |
@@ -512,7 +516,7 @@ jobs:
       - name: Use system Python (host deps)
         if: ${{ env.CI_INSTALL_HOST_DEPS != 'true' }}
         run: |
-          python3 -c "import serial, requests" || { echo "На хосте: pip install --user -r requirements-test.txt или CI_INSTALL_HOST_DEPS=true"; exit 1; }
+          python3 -c "import serial, requests" || { echo "On host: pip install --user -r requirements-test.txt, or set CI_INSTALL_HOST_DEPS=true"; exit 1; }
           echo "PY=python3" >> "$GITHUB_ENV"
           echo "✓ Using system python3"
 
@@ -522,19 +526,19 @@ jobs:
           set -euo pipefail
           echo "═══════════════════════════════════════════════════════════════════"
           echo "🧪 RNG UART capture (scripts/capture_rng_uart.py)"
-          echo "   Прошивка: USE_RNG_DUMP=${CI_BUILD_USE_RNG_DUMP:-1} (1 = бинарный TRNG на UART)."
-          echo "   Пропуск capture: CI_SKIP_RNG_UART_CAPTURE=1 или CI_BUILD_USE_RNG_DUMP≠1 (без CI_RNG_UART_CAPTURE_FORCE=1)."
-          echo "   Док: documentation/06-integrity-rng-verification.md, 07-build-ci-infrastructure.md"
+          echo "   Firmware: USE_RNG_DUMP=${CI_BUILD_USE_RNG_DUMP:-1} (1 = binary TRNG on UART)."
+          echo "   Skip capture: CI_SKIP_RNG_UART_CAPTURE=1 or CI_BUILD_USE_RNG_DUMP!=1 (unless CI_RNG_UART_CAPTURE_FORCE=1)."
+          echo "   Docs: documentation/06-integrity-rng-verification.md, 07-build-ci-infrastructure.md"
           echo "═══════════════════════════════════════════════════════════════════"
           if [ "${CI_SKIP_RNG_UART_CAPTURE:-0}" = "1" ]; then
-            echo "⏭️  CI_SKIP_RNG_UART_CAPTURE=1 — пропуск захвата RNG"
+            echo "⏭️  CI_SKIP_RNG_UART_CAPTURE=1 - skipping RNG capture"
             : > rng_test.bin
             ls -la rng_test.bin
             exit 0
           fi
           if [ "${CI_BUILD_USE_RNG_DUMP:-0}" != "1" ] && [ "${CI_RNG_UART_CAPTURE_FORCE:-0}" != "1" ]; then
-            echo "⏭️  Пропуск RNG capture: CI_BUILD_USE_RNG_DUMP≠1 (ожидаемо для сборки с текстовыми логами на UART)."
-            echo "    Чтобы тестировать бинарный поток: CI_BUILD_USE_RNG_DUMP=1 + прошивка с USE_RNG_DUMP=1."
+            echo "⏭️  Skipping RNG capture: CI_BUILD_USE_RNG_DUMP!=1 (expected for firmware with text UART logs)."
+            echo "    To test binary stream: CI_BUILD_USE_RNG_DUMP=1 + firmware built with USE_RNG_DUMP=1."
             : > rng_test.bin
             ls -la rng_test.bin
             exit 0
@@ -555,17 +559,17 @@ jobs:
             SIZE=$(stat -f%z rng_test.bin 2>/dev/null || stat -c%s rng_test.bin)
             echo "📦 rng_test.bin size: $SIZE bytes (exit code from capture: $cap_rc)"
             if [ "$SIZE" -eq 0 ] || [ "$cap_rc" -ne 0 ]; then
-              echo "⚠️ RNG capture incomplete or failed (см. лог выше; для полного захвата нужна прошивка USE_RNG_DUMP=1)"
+              echo "⚠️ RNG capture incomplete or failed (see log above; full capture requires firmware with USE_RNG_DUMP=1)"
             fi
           else
-            echo "⚠️ rng_test.bin не создан — ошибка до открытия порта"
+            echo "⚠️ rng_test.bin was not created - failure happened before opening the port"
           fi
           if [ "$cap_rc" -ne 0 ]; then
             echo "RNG capture exit code: $cap_rc (CI_RNG_UART_CAPTURE_STRICT=${CI_RNG_UART_CAPTURE_STRICT:-0})"
             if [ "${CI_RNG_UART_CAPTURE_STRICT:-0}" = "1" ]; then
               exit "$cap_rc"
             fi
-            echo "✓ Шаг завершён успешно (не strict): полный RNG — на runner с платой; для обязательного захвата задайте CI_RNG_UART_CAPTURE_STRICT=1."
+            echo "✓ Step completed successfully (non-strict): full RNG capture is expected on board runner; set CI_RNG_UART_CAPTURE_STRICT=1 to enforce."
           fi
           exit 0
 
@@ -575,41 +579,41 @@ jobs:
           set -euo pipefail
           MIN="${CI_RNG_DIEHARDER_MIN_BYTES:-262144}"
           if [ ! -f rng_test.bin ]; then
-            echo "⚠️ Skipping DIEHARDER (нет rng_test.bin)"
+            echo "⚠️ Skipping DIEHARDER (no rng_test.bin)"
             echo "skipped: no rng_test.bin" > dieharder_snippet.log
             exit 0
           fi
           SIZE=$(stat -f%z rng_test.bin 2>/dev/null || stat -c%s rng_test.bin)
           if [ "$SIZE" -lt "$MIN" ]; then
-            echo "⚠️ Skipping DIEHARDER: rng_test.bin слишком мал ($SIZE байт, нужно ≥ $MIN)."
-            echo "При пустом/коротком файле dieharder подставляет свой генератор (не данные с МК)."
-            echo "skipped: size $SIZE < min $MIN (нужна прошивка USE_RNG_DUMP=1 и успешный RNG capture)" > dieharder_snippet.log
+            echo "⚠️ Skipping DIEHARDER: rng_test.bin is too small ($SIZE bytes, need >= $MIN)."
+            echo "With empty/short files, dieharder can fall back to its own generator (not MCU data)."
+            echo "skipped: size $SIZE < min $MIN (requires firmware with USE_RNG_DUMP=1 and successful RNG capture)" > dieharder_snippet.log
             exit 0
           fi
           if ! command -v dieharder >/dev/null 2>&1; then
-            echo "⚠️ dieharder не в PATH (sudo apt install dieharder)"
+            echo "⚠️ dieharder not in PATH (sudo apt install dieharder)"
             echo "skipped: dieharder not installed" > dieharder_snippet.log
             exit 0
           fi
           echo "📊 DIEHARDER on $SIZE bytes (min $MIN)..."
           set +e
           if [ "${CI_RNG_DIEHARDER_FULL:-0}" = "1" ]; then
-            echo "   (режим FULL -a — может занять десятки минут)"
+            echo "   (FULL mode -a may take tens of minutes)"
             dieharder -a -g 201 -f rng_test.bin > dieharder_full.log 2>&1
             dh_rc=$?
             head -120 dieharder_full.log | tee dieharder_snippet.log
-            echo "dieharder exit code: $dh_rc (см. dieharder_full.log)"
+            echo "dieharder exit code: $dh_rc (see dieharder_full.log)"
           else
-            echo "   (быстрый smoke: -d 0 diehard_birthdays -g 201 -f …; полный набор: CI_RNG_DIEHARDER_FULL=1)"
+            echo "   (quick smoke: -d 0 diehard_birthdays -g 201 -f ...; full set: CI_RNG_DIEHARDER_FULL=1)"
             dieharder -d 0 -g 201 -f rng_test.bin > dieharder_snippet.log 2>&1
             dh_rc=$?
             cat dieharder_snippet.log
-            echo "dieharder exit code: $dh_rc (обычно 0 даже при FAILED в таблице — см. ниже)"
+            echo "dieharder exit code: $dh_rc (usually 0 even with FAILED entries in table; see below)"
             echo ""
-            echo "ℹ️  Как читать smoke: колонка Assessment (FAILED/WEAK/Passed) — результат одного статтеста на файле."
-            echo "    При «The file … was rewound N times» выборки не независимы как у бесконечного RNG —"
-            echo "    пограничные p-value ожидаемы. Для приёмки TRNG: больший capture (сотни MiB) и полный -a,"
-            echo "    либо внешний прогон dieharder/ent по сохранённому rng_test.bin."
+            echo "ℹ️  How to read smoke output: Assessment column (FAILED/WEAK/Passed) is one statistical test result on this file."
+            echo "    When you see 'The file ... was rewound N times', samples are not independent like an infinite RNG stream,"
+            echo "    so borderline p-values are expected. For TRNG acceptance: larger capture (hundreds of MiB) and full -a,"
+            echo "    or run external dieharder/ent on saved rng_test.bin."
           fi
           set -e
           exit 0

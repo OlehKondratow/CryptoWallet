@@ -1,10 +1,10 @@
 #!/bin/bash
 # Quick test runner - activates venv and runs scripts/test_rng_signing_comprehensive.py
 #
-# Примеры:
+# Examples:
 #   ./scripts/run-tests.sh --mode verify-all --quick --skip-signing
 #   ./scripts/run-tests.sh --mode analyze --file rng.bin
-# Полный лабораторный RNG-конвейер (отдельный скрипт):
+# Full laboratory RNG pipeline (separate script):
 #   ./scripts/run_full_rng_verification.sh
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

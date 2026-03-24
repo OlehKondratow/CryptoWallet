@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Удаляет все записи о workflow runs в Gitea (SQLite), без затронутых runner'ов.
-# Требуется: контейнер cryptowallet-gitea (podman/docker) и доступ к /data/gitea/gitea.db внутри.
+# Deletes all workflow run records in Gitea (SQLite), without touching runners.
+# Requires: cryptowallet-gitea container (podman/docker) and access to /data/gitea/gitea.db inside.
 #
-# Использование:
+# Usage:
 #   ./infra/delete-all-workflow-runs.sh
-# Или с другим именем контейнера:
+# Or with a different container name:
 #   GITEA_CONTAINER=my-gitea ./infra/delete-all-workflow-runs.sh
 
 set -euo pipefail
@@ -16,14 +16,14 @@ if ! podman exec "$GITEA_CONTAINER" test -r "$DB_PATH" 2>/dev/null; then
   if docker exec "$GITEA_CONTAINER" test -r "$DB_PATH" 2>/dev/null; then
     RUNTIME=docker
   else
-    echo "❌ Контейнер не найден или нет БД: $GITEA_CONTAINER ($DB_PATH)"
+    echo "❌ Container not found or DB missing: $GITEA_CONTAINER ($DB_PATH)"
     exit 1
   fi
 else
   RUNTIME=podman
 fi
 
-echo "Используется: $RUNTIME exec $GITEA_CONTAINER → $DB_PATH"
+echo "Using: $RUNTIME exec $GITEA_CONTAINER -> $DB_PATH"
 
 $RUNTIME exec "$GITEA_CONTAINER" sqlite3 "$DB_PATH" "
 BEGIN IMMEDIATE;
@@ -39,4 +39,4 @@ SELECT 'action_run', COUNT(*) FROM action_run
 UNION ALL SELECT 'action_run_job', COUNT(*) FROM action_run_job;
 "
 
-echo "✅ Все workflow runs удалены из БД (runner'ы и токены не трогались)."
+echo "✅ All workflow runs deleted from DB (runners and tokens were not touched)."

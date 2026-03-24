@@ -230,7 +230,7 @@ cat ~/gitea-runner/config.yaml
 Name: host-runner-ws8
 Status: ACTIVE (systemd service)
 Version: v0.3.0
-Labels: `cryptowallet-host:host` — совпадает с `runs-on: cryptowallet-host` в `simple-ci.yml`.
+Labels: `cryptowallet-host:host` - matches `runs-on: cryptowallet-host` in `simple-ci.yml`.
 Capacity: 1 job at a time
 Podman Socket: /run/user/1000/podman/podman.sock
 ```
@@ -245,8 +245,8 @@ Podman Socket: /run/user/1000/podman/podman.sock
 
 ## 🎯 Next Steps
 
-1. **Test CI**: Push в `main` или запуск `.gitea/workflows/simple-ci.yml` вручную (Actions)
-2. **Доп. сценарии**: при необходимости добавьте отдельные workflow-файлы в `.gitea/workflows/`
+1. **Test CI**: Push to `main` or run `.gitea/workflows/simple-ci.yml` manually (Actions)
+2. **Extra scenarios**: if needed, add separate workflow files in `.gitea/workflows/`
 3. **Test UART**: Create custom workflow with `capture_rng_uart.py`
 4. **Full HIL**: When hardware is connected
 

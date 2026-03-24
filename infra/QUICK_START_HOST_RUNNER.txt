@@ -1,8 +1,8 @@
 # Host Runner - Quick Start
 
-## 🚀 30-Второе Начало
+## 🚀 30-Second Start
 
-### 1. Запустить скрипт установки
+### 1. Run setup script
 
 ```bash
 cd /data/projects/CryptoWallet/infra
@@ -10,63 +10,63 @@ chmod +x setup-host-runner.sh
 ./setup-host-runner.sh
 ```
 
-Скрипт спросит token. **Где его взять:**
+Script will ask for a token. **Where to get it:**
 
-1. Открыть: http://localhost:3000/admin/runners
-2. Нажать "Create new Runner" (синяя кнопка)
-3. Скопировать токен
-4. Вставить в скрипт
+1. Open: http://localhost:3000/admin/runners
+2. Click "Create new Runner" (blue button)
+3. Copy token
+4. Paste into script
 
-### 2. Проверить статус
+### 2. Check status
 
 ```bash
 systemctl --user status gitea-runner
 ```
 
-Должно быть: **Active (running)**
+Expected: **Active (running)**
 
-### 3. Проверить в Gitea UI
+### 3. Check in Gitea UI
 
 http://localhost:3000/admin/runners
 
-Должны видеть 2 раннера:
+You should see 2 runners:
 - Container (ID 6) - ACTIVE ✅
-- Host runner - ACTIVE ✅ (новый)
+- Host runner - ACTIVE ✅ (new)
 
 ---
 
-## 🧹 Очистка Старых Раннеров
+## 🧹 Clean Up Old Runners
 
-В Gitea UI:
+In Gitea UI:
 1. **Admin → Runners Management**
-2. Для каждого OFFLINE раннера (ID 3, 4, 5):
-   - Нажать **Edit**
-   - Нажать **Delete**
+2. For each OFFLINE runner (ID 3, 4, 5):
+   - Click **Edit**
+   - Click **Delete**
 
 ---
 
-## 🧪 Тестирование
+## 🧪 Testing
 
-### Запустить CI (simple-ci):
+### Run CI (simple-ci):
 
 ```bash
 cd /data/projects/CryptoWallet
 git add .gitea/workflows/simple-ci.yml
-git commit -m "ci: trigger Simple CI"   # если файл уже в репо — достаточно пустого commit + push
+git commit -m "ci: trigger Simple CI"   # if file already exists in repo, empty commit + push is enough
 git push
 ```
 
-Затем в Gitea: **Actions** → **Simple CI** → при необходимости **Run workflow** (если в workflow есть `workflow_dispatch`).
+Then in Gitea: **Actions** -> **Simple CI** -> if needed, click **Run workflow** (when `workflow_dispatch` exists).
 
 ---
 
-## 📊 Результат
+## 📊 Result
 
-| Компонент | Статус |
+| Component | Status |
 |-----------|--------|
 | Gitea | 🟢 Running |
 | Container Runner | 🟢 Active |
-| Host Runner | 🟢 Active (после setup) |
-| Pipeline | ✅ Готов |
+| Host Runner | 🟢 Active (after setup) |
+| Pipeline | ✅ Ready |
 
-**Готово!** 🎉
+**Done!** 🎉

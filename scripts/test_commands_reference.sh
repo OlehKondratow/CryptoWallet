@@ -1,9 +1,9 @@
 #!/bin/bash
 # CryptoWallet RNG & Signing Tests - Quick Command Reference
-# Все необходимые команды для полного цикла тестирования
+# All required commands for a full testing cycle
 
 # ============================================================================
-# УСТАНОВКА ЗАВИСИМОСТЕЙ
+# DEPENDENCY INSTALLATION
 # ============================================================================
 
 echo "=== Installing Dependencies ==="
@@ -16,7 +16,7 @@ sudo apt update
 sudo apt install doxygen dieharder
 
 # ============================================================================
-# ФАЗА 1: ПОДГОТОВКА К RNG ТЕСТИРОВАНИЮ
+# PHASE 1: RNG TEST PREPARATION
 # ============================================================================
 
 echo ""
@@ -24,118 +24,118 @@ echo "=== Phase 1: RNG Preparation ==="
 
 cd /data/projects/CryptoWallet
 
-# Сборка прошивки с RNG dump
+# Build firmware with RNG dump
 make clean
 make USE_CRYPTO_SIGN=1 USE_TEST_SEED=1 USE_RNG_DUMP=1 -j4
 
-# Проверка размера
+# Size check
 arm-none-eabi-size build/firmware.elf
 
-# Прошивка на устройство
+# Flash firmware to device
 make flash
 
-# Проверка интеграции trezor-crypto
+# Verify trezor-crypto integration
 arm-none-eabi-nm build/firmware.elf | grep -E "bip39|ecdsa|secp256k1"
 
 # ============================================================================
-# ФАЗА 2: ЗАХВАТ RNG ДАННЫХ (30 мин)
+# PHASE 2: RNG DATA CAPTURE (30 min)
 # ============================================================================
 
 echo ""
 echo "=== Phase 2: RNG Data Capture (30 minutes at 115200 baud) ==="
 
-# Проверить UART вывод (должны видеть только сырые байты)
+# Check UART output (should be raw bytes only)
 # screen /dev/ttyACM0 115200
-# (Ctrl-A, Ctrl-\ для выхода)
+# (Ctrl-A, Ctrl-\ to exit)
 
-# Захват 128 MiB RNG данных (стандартный размер для Dieharder)
+# Capture 128 MiB of RNG data (standard size for Dieharder)
 python3 scripts/test_rng_signing_comprehensive.py --mode rng --port /dev/ttyACM0
 
-# Проверка файла
+# File check
 ls -lh rng.bin
 file rng.bin
 
-# Если нужны 256 MiB (для более надёжного теста)
+# If you need 256 MiB (for a more robust test)
 python3 scripts/test_rng_signing_comprehensive.py --mode rng --bytes 268435456 --output rng_256mb.bin
 
 # ============================================================================
-# ФАЗА 3: АНАЛИЗ КАЧЕСТВА RNG
+# PHASE 3: RNG QUALITY ANALYSIS
 # ============================================================================
 
 echo ""
 echo "=== Phase 3: RNG Quality Analysis ==="
 
-# Быстрый анализ (entropy, chi-square, distribution)
+# Quick analysis (entropy, chi-square, distribution)
 python3 scripts/test_rng_signing_comprehensive.py --mode rng --file rng.bin
 
-# Статистика файла
+# File statistics
 stat rng.bin
 
-# SHA256 для верификации целостности
+# SHA256 for integrity verification
 sha256sum rng.bin > rng.bin.sha256
 
 # ============================================================================
-# ФАЗА 4: DIEHARDER СТАТИСТИЧЕСКИЕ ТЕСТЫ (1-3 часа)
+# PHASE 4: DIEHARDER STATISTICAL TESTS (1-3 hours)
 # ============================================================================
 
 echo ""
 echo "=== Phase 4: DIEHARDER Statistical Tests (1-3 hours) ==="
 
-# Список доступных тестов
+# List available tests
 dieharder -l
 
-# Все тесты (обычно 100+ тестов)
+# Run all tests (typically 100+)
 python3 scripts/test_rng_signing_comprehensive.py --mode dieharder --file rng.bin \
   | tee dieharder_results.txt
 
-# Или отдельные тесты для отладки
-dieharder -g 201 -f rng.bin -d 1          # Тест 1 (birthdays)
-dieharder -g 201 -f rng.bin -d 2          # Тест 2
-dieharder -g 201 -f rng.bin -d 1 -p 0     # Тест 1, subtest 0
+# Or specific tests for debugging
+dieharder -g 201 -f rng.bin -d 1          # Test 1 (birthdays)
+dieharder -g 201 -f rng.bin -d 2          # Test 2
+dieharder -g 201 -f rng.bin -d 1 -p 0     # Test 1, subtest 0
 
-# Анализ результатов
+# Analyze results
 grep "PASS" dieharder_results.txt | wc -l
 grep "FAIL" dieharder_results.txt | wc -l
 grep "WEAK" dieharder_results.txt | wc -l
 
-# Сохранить результаты
+# Save results
 cp dieharder_results.txt dieharder_results_$(date +%Y%m%d_%H%M%S).txt
 
 # ============================================================================
-# ФАЗА 5: ПОДГОТОВКА К ТЕСТИРОВАНИЮ ПОДПИСАНИЯ
+# PHASE 5: SIGNING TEST PREPARATION
 # ============================================================================
 
 echo ""
 echo "=== Phase 5: Transaction Signing Preparation ==="
 
-# Пересборка прошивки с HTTP вместо RNG dump
+# Rebuild firmware with HTTP instead of RNG dump
 make clean
 make USE_CRYPTO_SIGN=1 USE_TEST_SEED=1 USE_LWIP=1 -j4
 
-# Прошивка
+# Flash firmware
 make flash
 
-# Проверка конфигурации
+# Check configuration
 grep -n "USE_LWIP\|USE_CRYPTO_SIGN\|USE_TEST_SEED" Makefile | head -10
 
 # ============================================================================
-# ФАЗА 6: ПРОВЕРКА УСТРОЙСТВА
+# PHASE 6: DEVICE CHECK
 # ============================================================================
 
 echo ""
 echo "=== Phase 6: Device Connectivity Check ==="
 
-# Дождаться включения DHCP (если используется)
+# Wait for DHCP to come up (if used)
 sleep 5
 
-# Пинг устройства
+# Ping device
 ping -c 3 192.168.0.10
 
-# Проверить статус через curl
+# Check status via curl
 curl http://192.168.0.10/status
-# Ожидаемый ответ: {"status":"ready"}
+# Expected response: {"status":"ready"}
 
-# Или через Python requests
+# Or via Python requests
 python3 << 'EOF'
 import requests
 try:
@@ -147,19 +147,19 @@ except Exception as e:
 EOF
 
 # ============================================================================
-# ФАЗА 7: ТЕСТИРОВАНИЕ ПОДПИСАНИЯ ТРАНЗАКЦИЙ
+# PHASE 7: TRANSACTION SIGNING TESTS
 # ============================================================================
 
 echo ""
 echo "=== Phase 7: Transaction Signing Tests ==="
 
-# Запустить полный набор тестов подписания
+# Run full signing test suite
 python3 scripts/test_rng_signing_comprehensive.py --mode signing --ip 192.168.0.10
 
-# Или на другом IP
+# Or with a different IP
 python3 scripts/test_rng_signing_comprehensive.py --mode signing --ip 192.168.1.100
 
-# Ручная отправка транзакции (для отладки)
+# Manual transaction submission (for debugging)
 python3 << 'EOF'
 import requests
 import json
@@ -170,84 +170,84 @@ tx = {
     "currency": "BTC"
 }
 
-# POST транзакция
+# POST transaction
 r = requests.post("http://192.168.0.10/tx", json=tx, timeout=5)
 print(f"POST: {r.status_code}")
 
-# Ждём подтверждения (нужно нажать кнопку!)
+# Wait for confirmation (press the device button!)
 import time
 time.sleep(2)
 
-# GET подпись
+# GET signature
 r = requests.get("http://192.168.0.10/tx/signed", timeout=5)
 print(f"GET: {r.status_code}")
 print(f"Response: {r.json()}")
 EOF
 
 # ============================================================================
-# ФАЗА 8: ПРОВЕРКА ДЕТЕРМИНИЗМА (RFC6979)
+# PHASE 8: DETERMINISM CHECK (RFC6979)
 # ============================================================================
 
 echo ""
 echo "=== Phase 8: RFC6979 Determinism Test ==="
 
-# Проверить: одинаковые TX → одинаковые подписи
+# Verify: identical TX -> identical signatures
 python3 scripts/test_rng_signing_comprehensive.py --mode signing --ip 192.168.0.10 \
   | grep -A 10 "Deterministic"
 
 # ============================================================================
-# ФАЗА 9: ПОЛНОЕ ТЕСТИРОВАНИЕ (ВСЕ СИСТЕМЫ)
+# PHASE 9: COMPLETE TESTING (ALL SYSTEMS)
 # ============================================================================
 
 echo ""
 echo "=== Phase 9: Complete Verification (ALL) ==="
 
-# Автоматически запустит: RNG capture + DIEHARDER + Signing tests
+# Automatically runs: RNG capture + DIEHARDER + signing tests
 python3 scripts/test_rng_signing_comprehensive.py --mode verify-all \
   | tee full_test_results_$(date +%Y%m%d_%H%M%S).txt
 
 # ============================================================================
-# ДОПОЛНИТЕЛЬНЫЕ КОМАНДЫ ДЛЯ ОТЛАДКИ
+# ADDITIONAL DEBUG COMMANDS
 # ============================================================================
 
 echo ""
 echo "=== Debug Commands ==="
 
-# 1. Проверить наличие Doxygen комментариев
+# 1. Check presence of Doxygen comments
 rg "@brief|@details" Core/Src/*.c | head -20
 
-# 2. Регенерировать документацию
+# 2. Regenerate documentation
 make docs-md
 make docs-doxygen
 make docs
 
-# 3. Проверить конфигурацию trezor-crypto
+# 3. Check trezor-crypto configuration
 arm-none-eabi-nm build/firmware.elf | grep random_buffer
 arm-none-eabi-nm build/firmware.elf | grep memzero
 
-# 4. Проверить размеры секций
+# 4. Check section sizes
 arm-none-eabi-objdump -h build/firmware.elf | grep -E "\.text|\.rodata|\.data"
 
-# 5. Список всех символов
+# 5. List all symbols
 arm-none-eabi-nm build/firmware.elf | sort | tail -50
 
-# 6. Проверить LCG параметры
+# 6. Check LCG parameters
 grep -n "1664525\|1013904223" Core/Src/crypto_wallet.c
 
-# 7. Проверить использование memzero
+# 7. Check memzero usage
 grep -n "memzero" Core/Src/crypto_wallet.c
 
-# 8. Проверить RFC6979
+# 8. Check RFC6979
 grep -n "rfc6979\|is_canonical" Core/Src/crypto_wallet.c
 
 # ============================================================================
-# ИТОГОВЫЕ КОМАНДЫ ОТЧЁТА
+# FINAL REPORT COMMANDS
 # ============================================================================
 
 echo ""
 echo "=== Generate Test Report ==="
 
-# Создать финальный отчёт
+# Create final report
 cat > cryptowallet_test_report.md << REPORT
 # CryptoWallet Security Test Report
 
@@ -257,8 +257,8 @@ cat > cryptowallet_test_report.md << REPORT
 ## RNG Analysis
 - File: $(ls -lh rng.bin | awk '{print $9, $5}')
 - SHA256: $(sha256sum rng.bin | cut -d' ' -f1)
-- Entropy: [заполнить из результатов]
-- Chi-square: [заполнить из результатов]
+- Entropy: [fill from results]
+- Chi-square: [fill from results]
 
 ## DIEHARDER Results
 - PASS tests: $(grep -c "PASS" dieharder_results.txt 2>/dev/null || echo "?")
@@ -268,35 +268,35 @@ cat > cryptowallet_test_report.md << REPORT
 ## Signing Verification
 - Device IP: 192.168.0.10
 - HTTP Status: $(curl -s http://192.168.0.10/status | jq . 2>/dev/null || echo "Offline")
-- Test Results: [заполнить вручную]
-- RFC6979 Determinism: [заполнить вручную]
+- Test Results: [fill manually]
+- RFC6979 Determinism: [fill manually]
 
 ## Recommendations
-- [заполнить вручную]
+- [fill manually]
 
 REPORT
 
 cat cryptowallet_test_report.md
 
 # ============================================================================
-# ОЧИСТКА И АРХИВИРОВАНИЕ
+# CLEANUP AND ARCHIVING
 # ============================================================================
 
 echo ""
 echo "=== Cleanup and Archive ==="
 
-# Архивировать результаты
+# Archive results
 mkdir -p test_results_$(date +%Y%m%d)
 cp rng.bin dieharder_results.txt cryptowallet_test_report.md test_results_$(date +%Y%m%d)/
 
-# Сжать архив
+# Compress archive
 tar -czf cryptowallet_tests_$(date +%Y%m%d).tar.gz test_results_$(date +%Y%m%d)/
 
-# Вывести информацию об архиве
+# Print archive info
 ls -lh cryptowallet_tests_*.tar.gz
 
 # ============================================================================
-# УСПЕШНОЕ ЗАВЕРШЕНИЕ
+# SUCCESSFUL COMPLETION
 # ============================================================================
 
 echo ""

@@ -1,6 +1,6 @@
-# Сводка подсистем кошелька (см. APP_LOG_WALLET_* в Core/Inc/app_log.h).
-# Порядок в UART не важен (uart_wait_boot_log.py по умолчанию — любой порядок).
-# Без Ethernet-кабеля строка [WALLET] ETH info не появится — job упадёт по таймауту.
+# Wallet subsystem summary (see APP_LOG_WALLET_* in Core/Inc/app_log.h).
+# UART order is not important (uart_wait_boot_log.py uses any-order by default).
+# Without Ethernet cable, [WALLET] ETH info will not appear and the job may timeout.
 
 [INFO] [WALLET] MAIN ok
 [INFO] [WALLET] SIGN info

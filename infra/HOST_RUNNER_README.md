@@ -219,7 +219,7 @@ curl http://localhost:3000/api/v1/version
 
 ## 📝 Testing
 
-Проект использует `.gitea/workflows/simple-ci.yml`. Пример отдельного тестового workflow:
+This project uses `.gitea/workflows/simple-ci.yml`. Example of a separate test workflow:
 
 ```yaml
 name: Test Both Runners

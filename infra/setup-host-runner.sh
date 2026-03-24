@@ -8,7 +8,7 @@ RUNNER_VERSION="v0.3.0"
 RUNNER_ARCH="linux_amd64"
 RUNNER_HOME="${HOME}/gitea-runner"
 RUNNER_NAME="host-runner-$(hostname)"
-# Тот же URL, что GITEA_ROOT_URL в compose (по умолчанию localhost с пробросом порта)
+# Same URL as GITEA_ROOT_URL in compose (localhost with port mapping by default)
 GITEA_URL="${GITEA_URL:-http://127.0.0.1:3000}"
 GITEA_TOKEN="${GITEA_TOKEN:-}"
 

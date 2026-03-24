@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Полная лабораторная проверка RNG: захват (capture_rng_uart.py) + анализ + dieharder + отчёт.
-# Требует: прошивка с USE_RNG_DUMP=1, устройство на CI_UART_PORT (по умолчанию /dev/ttyACM0).
+# Full laboratory RNG verification: capture (capture_rng_uart.py) + analysis + dieharder + report.
+# Requires: firmware built with USE_RNG_DUMP=1, device at CI_UART_PORT (default /dev/ttyACM0).
 #
-# Использование:
+# Usage:
 #   ./scripts/run_full_rng_verification.sh
 #   RNG_CAPTURE_BYTES=134217728 ./scripts/run_full_rng_verification.sh
-#   QUICK=1 ./scripts/run_full_rng_verification.sh   # 1 MiB + один тест dieharder
+#   QUICK=1 ./scripts/run_full_rng_verification.sh   # 1 MiB + one dieharder test
 #
 set -euo pipefail
 
@@ -24,14 +24,14 @@ if [[ "$QUICK" == "1" ]]; then
 fi
 
 echo "═══════════════════════════════════════════════════════════════════"
-echo " CryptoWallet — полная проверка RNG (лабораторный сценарий)"
+echo " CryptoWallet - full RNG verification (laboratory scenario)"
 echo "═══════════════════════════════════════════════════════════════════"
-echo "Репозиторий: $REPO_ROOT"
-echo "Порт: $PORT  |  байт захвата: $BYTES"
+echo "Repository: $REPO_ROOT"
+echo "Port: $PORT  |  capture bytes: $BYTES"
 echo ""
-echo "Перед запуском:"
+echo "Before starting:"
 echo "  1) make clean && make USE_RNG_DUMP=1 … && make flash"
-echo "  2) На UART — только бинарный поток (без текстовых логов)."
+echo "  2) UART should output binary stream only (no text logs)."
 echo ""
 
 {
@@ -49,7 +49,7 @@ if [[ ! -e "$PORT" ]]; then
 fi
 
 if ! command -v dieharder >/dev/null 2>&1; then
-  echo "WARN: dieharder not in PATH — установите пакет dieharder для фазы 3." | tee -a "$REPORT"
+  echo "WARN: dieharder not in PATH - install dieharder package for phase 3." | tee -a "$REPORT"
 fi
 
 echo ">>> Phase 1: capture (scripts/capture_rng_uart.py)" | tee -a "$REPORT"
@@ -83,7 +83,7 @@ if [[ "$AN_RC" -ne 0 ]]; then
 fi
 
 echo "" | tee -a "$REPORT"
-echo ">>> Phase 3: dieharder (через test_rng_signing_comprehensive.py)" | tee -a "$REPORT"
+echo ">>> Phase 3: dieharder (via test_rng_signing_comprehensive.py)" | tee -a "$REPORT"
 if ! command -v dieharder >/dev/null 2>&1; then
   echo "Skip dieharder (not installed)." | tee -a "$REPORT"
   exit 0
